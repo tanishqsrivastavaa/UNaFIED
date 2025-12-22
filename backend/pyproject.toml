@@ -1,0 +1,12 @@
+[project]
+name = "unafied"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.17.2",
+    "fastapi[standard]>=0.127.0",
+    "pydantic-ai>=1.37.0",
+    "sqlmodel>=0.0.27",
+]
