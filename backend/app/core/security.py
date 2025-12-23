@@ -5,36 +5,33 @@ from typing import Optional
 from datetime import datetime,timedelta
 from passlib.context import CryptContext
 import jwt
+from fastapi.security import HTTPBearer 
+from db.db import get_session
 
 load_dotenv()
+
 SECRET_KEY= os.getenv("AUTH_KEY")
 if not SECRET_KEY:
     raise ValueError("No AUTH_KEY found in environment variables!")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+bearer_scheme= HTTPBearer()
 
-pwd_content= CryptContext(schemes=["bcrypt"],deprecated="auto")
-
-
-
-def get_password_hash(password: str) -> str:
-    return pwd_content.hash(password)
-
-
-def verify_password_hash(plain_password: str, hash_password: str) -> bool:
-    return pwd_content.verify(plain_password,hash_password)
-
-
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta]= None):
+def create_access_token(data: dict, expires_delta: timedelta | None=None) -> str:
     
-    to_encode= data.copy()
+    to_encode = data.copy()
+
     if expires_delta:
         expire = datetime.now() + expires_delta
     else:
-        expire= datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    to_encode.update({"exp": expire})
-    encoded_jwt= jwt.encode(to_encode,SECRET_KEY,algorithm=ALGORITHM)
+    to_encode.update({"exp":expire})
+
+    encoded_jwt = jwt.encode(to_encode,SECRET_KEY,algorithm=ALGORITHM)
+
     return encoded_jwt
+
+
