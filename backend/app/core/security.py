@@ -3,10 +3,12 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 from datetime import datetime,timedelta
-from passlib.context import CryptContext
 import jwt
-from fastapi.security import HTTPBearer 
+from jwt import PyJWTError
+from fastapi.security import HTTPBearer
+from fastapi import HTTPException
 from db.db import get_session
+from typing import Any
 
 load_dotenv()
 
@@ -35,3 +37,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None=None) -> str
     return encoded_jwt
 
 
+def verify_token(token: str) -> dict[str,Any]:
+    try:
+        payload = jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+        return payload
+    except PyJWTError:
+        raise HTTPException(status_code=401,detail= "Could not validate credentials")
