@@ -7,6 +7,6 @@ bearer_scheme = HTTPBearer()
 app = FastAPI()
 app.include_router(users.router,prefix="/api/v1",tags=["users"])
 
-@app.get("/healthz")
+@app.get("/healthcheck")
 def health() -> dict[str,str]:
     return {"status":"ok"}
