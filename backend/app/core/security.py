@@ -5,11 +5,12 @@ from typing import Optional
 from datetime import datetime,timedelta
 import jwt
 from jwt import PyJWTError
-from fastapi.security import HTTPBearer
-from fastapi import HTTPException
+from fastapi.security import HTTPBearer,HTTPAuthorizationCredentials
+from fastapi import HTTPException,Depends
+from sqlmodel import Session
 from db.db import get_session
 from typing import Any
-
+from passlib.context import CryptContext
 load_dotenv()
 
 SECRET_KEY= os.getenv("AUTH_KEY")
@@ -45,7 +46,7 @@ def verify_token(token: str) -> dict[str,Any]:
         raise HTTPException(status_code=401,detail= "Could not validate credentials")
     
 
-def get_current_user(token:str = Depends(bearer_scheme),session : Session = Depends(get_session)):
+def get_current_user(token:HTTPAuthorizationCredentials = Depends(bearer_scheme),session : Session = Depends(get_session)):
     try:
         token_string = token.credentials
 
@@ -54,7 +55,7 @@ def get_current_user(token:str = Depends(bearer_scheme),session : Session = Depe
 
         if user_id is None:
             raise HTTPException(
-                status_code = status.HTTP_401_UNAUTHORIZED,
+                status_code = 401,
                 detail = "Invalid authentication credentials"
             ,)
 
@@ -62,13 +63,22 @@ def get_current_user(token:str = Depends(bearer_scheme),session : Session = Depe
         user = session.exec(select(Users).where(Users.id == user_id)).first()
         if user is None:
                 raise HTTPException(
-                    status_code = status.HTTP_401_UNAUTHORIZED,
+                    status_code = 401,
                     detail = "User not found"
                 ,)
 
         return user
     except PyJWTError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=401,
             detail="Could not validate credentials",
         )
+
+
+pwd_content = CryptContext(schemes=["bcrypt"],deprecated="auto")
+
+def get_password_hash(password: str) -> str:
+    return pwd_content.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_content.verify(plain_password,hashed_password)
