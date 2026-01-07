@@ -1,14 +1,14 @@
 from fastapi import Depends,HTTPException
-from sqlmodel import Session
+from sqlmodel import Session,select
 import os
 from dotenv import load_dotenv
 import jwt
 from jwt import PyJWTError
 from datetime import datetime,timedelta
-from fastapi.security import HTTPBearer,HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
 from passlib.context import CryptContext
 from typing import Any
-from db.db import get_session
+from app.db.db import get_session
 
 load_dotenv()
 
@@ -61,7 +61,7 @@ def verify_token(token: str) -> dict[str,Any]:
 #now we make the function to get current user
 
 
-def get_current_user(token: HTTPAuthorizationCredentials = Depends(bearer_scheme),session: Session =Depends(get_session)):
+def get_current_user(token: str = Depends(bearer_scheme),session: Session =Depends(get_session)):
 
     try:
         token_string = token.credentials
