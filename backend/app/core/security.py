@@ -9,6 +9,7 @@ from fastapi.security import HTTPBearer
 from passlib.context import CryptContext
 from typing import Any
 from app.db.db import get_session
+from app.models.user import User
 
 load_dotenv()
 
@@ -71,7 +72,7 @@ def get_current_user(token: str = Depends(bearer_scheme),session: Session =Depen
         if user_id is None:
             raise HTTPException(status_code=401,detail="Invalid authentication credentials")
         
-        user = session.exec(select(Users).where(Users.id==user_id)).first()
+        user = session.exec(select(User).where(User.id==user_id)).first()
         if user is None:
             raise HTTPException(
                 status_code=401,
