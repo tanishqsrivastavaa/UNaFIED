@@ -61,7 +61,7 @@ The data layer is managed via SQLModel and PostgreSQL.
 
 📂 Directory Structure
 Plaintext
-
+```
 unafied-backend/
 ├── alembic/                # Database migrations
 ├── app/
@@ -82,7 +82,7 @@ unafied-backend/
 ├── docker-compose.yml
 ├── pyproject.toml          # uv dependency management
 └── README.md
-
+```
 ⚡ Getting Started
 Prerequisites
 
