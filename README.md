@@ -31,45 +31,13 @@ Unafied is a backend-heavy chat platform that goes beyond standard messaging. It
 
 ---
 
-## 🏗 System Architecture
+The Agentic Workflow
 
-The system uses a decoupled architecture to ensure chat latency is not affected by heavy AI processing.
+Real-Time Layer: Users communicate via WebSockets. Messages are persisted to Postgres and broadcast via Redis Pub/Sub immediately.
 
-```mermaid
-graph TD
-    Client[Client (WebSocket)]
-    API[FastAPI Server]
-    DB[(PostgreSQL + pgvector)]
-    Redis[(Redis Pub/Sub & Broker)]
-    Worker[Celery Worker]
-    LLM[OpenAI API]
+The "Listener" Agent: Every message triggers a background Celery task. This task generates a 1536-dimensional vector embedding of the content and stores it in the MessageEmbedding table.
 
-    %% Real-time Flow
-    Client -- Send Message --> API
-    API -- Save --> DB
-    API -- Publish --> Redis
-    Redis -- Broadcast --> Client
-
-    %% Async AI Flow
-    API -- Trigger Task --> Redis
-    Redis -- Consume --> Worker
-    Worker -- Generate Embedding --> LLM
-    Worker -- Save Vector --> DB
-    Worker -- Similarity Search --> DB
-    Worker -- Analyze Context --> LLM
-    
-    %% Proactive Push
-    Worker -- Push Recommendation --> Redis
-    Redis -- Push to Client --> Client
-    ```
-
-    The Agentic Workflow
-
-    Real-Time Layer: Users communicate via WebSockets. Messages are persisted to Postgres and broadcast via Redis Pub/Sub immediately.
-
-    The "Listener" Agent: Every message triggers a background Celery task. This task generates a 1536-dimensional vector embedding of the content and stores it in the MessageEmbedding table.
-
-    The "Recommender" Agent: The background worker performs Vector Similarity Search to understand the conversation history. If a specific intent (e.g., boredom, need for focus) is detected, the agent generates a structured recommendation and pushes it back to the client asynchronously.
+The "Recommender" Agent: The background worker performs Vector Similarity Search to understand the conversation history. If a specific intent (e.g., boredom, need for focus) is detected, the agent generates a structured recommendation and pushes it back to the client asynchronously.
 
 🗄 Database Schema
 
