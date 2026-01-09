@@ -61,6 +61,7 @@ graph TD
     %% Proactive Push
     Worker -- Push Recommendation --> Redis
     Redis -- Push to Client --> Client
+    ```
 
     The Agentic Workflow
 
