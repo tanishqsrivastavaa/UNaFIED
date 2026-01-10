@@ -1,7 +1,7 @@
 # Phase 2: Chat Session Management.
 ### 1. Create Data Schemas (DTOs)
 
-    [ ] Create a new file app/schemas/chat.py.
+    [X] Create a new file app/schemas/chat.py.
 
     [ ] Define ConversationCreate (Pydantic model) with a title field (optional/default).
 
