@@ -3,29 +3,29 @@
 
     [X] Create a new file app/schemas/chat.py.
 
-    [ ] Define ConversationCreate (Pydantic model) with a title field (optional/default).
+    [X] Define ConversationCreate (Pydantic model) with a title field (optional/default).
 
-    [ ] Define ConversationRead (Pydantic model) including id, title, created_at, and updated_at.
+    [X] Define ConversationRead (Pydantic model) including id, title, created_at, and updated_at.
 
 ### 2. Implement the Service Layer
 
-    [ ] Create a new file app/services/chat.py.
+    [X] Create a new file app/services/chat.py.
 
-    [ ] Create a ChatService class initialized with the database Session.
+    [X] Create a ChatService class initialized with the database Session.
 
-    [ ] Implement create_conversation(user_id, data):
+    [X] Implement create_conversation(user_id, data):
 
         Initialize a new Conversation model with the user's ID.
 
         Commit to DB and refresh.
 
-    [ ] Implement get_user_conversations(user_id, limit, offset):
+    [X] Implement get_user_conversations(user_id, limit, offset):
 
         Write a SQLModel query selecting conversations where user_id matches.
 
         Add .order_by(Conversation.updated_at.desc()) so recent chats appear first.
 
-    [ ] Implement get_conversation(conversation_id, user_id):
+    [] Implement get_conversation(conversation_id, user_id):
 
         Query for a specific ID and verify the user_id matches (security check).
 
