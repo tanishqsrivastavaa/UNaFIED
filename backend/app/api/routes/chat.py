@@ -6,10 +6,11 @@ from sqlmodel import Session
 from ...core.security import  get_current_user
 from ...db.db import get_session
 from ...models.user import User
-from ...schemas.chat import ConversationCreate,ConversationRead
+from ...schemas.chat import ConversationCreate,ConversationRead,ConversationDetail
 from ...services.chat import ChatService
 
-router= APIRouter()
+
+router = APIRouter(tags=["chats"])
 
 @router.get("/",response_model=ConversationRead)
 def create_conversation(
@@ -39,7 +40,7 @@ def read_conversations(
     )
 
 
-@router.get("/{conversation_id}",response_model=ConversationRead)
+@router.get("/{conversation_id}",response_model=ConversationDetail)
 def get_conversation(
     conversation_id: uuid.UUID,
     current_user: User= Depends(get_current_user),

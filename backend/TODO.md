@@ -25,26 +25,26 @@
 
         Add .order_by(Conversation.updated_at.desc()) so recent chats appear first.
 
-    [] Implement get_conversation(conversation_id, user_id):
+    [X] Implement get_conversation(conversation_id, user_id):
 
         Query for a specific ID and verify the user_id matches (security check).
 
 ### 3. Build the API Routes
 
-    [ ] Create a new file app/api/routes/chat.py.
+    [X] Create a new file app/api/routes/chat.py.
 
-    [ ] Create a POST / endpoint to start a new chat (uses ChatService.create_conversation).
+    [X] Create a POST / endpoint to start a new chat (uses ChatService.create_conversation).
 
-    [ ] Create a GET / endpoint to list history (uses ChatService.get_user_conversations).
+    [X] Create a GET / endpoint to list history (uses ChatService.get_user_conversations).
 
-    [ ] Create a GET /{conversation_id} endpoint to fetch details (uses ChatService.get_conversation).
+    [X] Create a GET /{conversation_id} endpoint to fetch details (uses ChatService.get_conversation).
 
         Tip: Raise a 404 HTTPException if the service returns None.
 
 ### 4. Wire It Up
 
-    [ ] Open app/main.py.
+    [X] Open app/main.py.
 
-    [ ] Import the new chat router.
+    [X] Import the new chat router.
 
-    [ ] Include the router with the prefix /api/v1/chats and tag ["Chats"].
+    [X] Include the router with the prefix /api/v1/chats and tag ["Chats"].
