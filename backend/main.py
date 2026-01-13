@@ -8,7 +8,7 @@ bearer_scheme = HTTPBearer()
 app = FastAPI()
 
 app.include_router(users.router,prefix="/api/v1",tags=["users"])
-app.include_router(chat.router,prefix="/api/routes",tags=["chats"])
+app.include_router(chat.router,prefix="/chat",tags=["chats"])
 
 
 @app.get("/healthcheck")
