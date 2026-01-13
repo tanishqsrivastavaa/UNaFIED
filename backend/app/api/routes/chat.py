@@ -1,18 +1,25 @@
 import uuid
-from typing import List
+from typing import List,Any
 from fastapi import Depends,APIRouter, HTTPException
 from sqlmodel import Session
 
 from ...core.security import  get_current_user
 from ...db.db import get_session
 from ...models.user import User
-from ...schemas.chat import ConversationCreate,ConversationRead,ConversationDetail
+from ...schemas.chat import (
+    ConversationCreate,
+    ConversationRead,
+    ConversationDetail,
+    MessageCreate,
+    MessageRead
+)
+
 from ...services.chat import ChatService
 
 
 router = APIRouter(tags=["chats"])
 
-@router.get("/",response_model=ConversationRead)
+@router.post("/",response_model=ConversationRead)
 def create_conversation(
     conversation_in: ConversationCreate,
     current_user: User= Depends(get_current_user),
@@ -56,3 +63,22 @@ def get_conversation(
         raise HTTPException(status_code=404, detail="Conversation not found")
     
     return conversation
+
+@router.post("/{conversation_id}/messages",response_model=MessageRead)
+async def send_message(
+    conversation_id: uuid.UUID,
+    message_in: MessageCreate,
+    current_user: User= Depends(get_current_user),
+    session: Session= Depends(get_session)
+) -> Any:
+    
+    try:
+        return await ChatService.process_chat_message(
+            session=session,
+            conversation_id=conversation_id,
+            user_id=current_user.id,
+            message_in=message_in
+        )
+    
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

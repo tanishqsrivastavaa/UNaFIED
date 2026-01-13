@@ -20,3 +20,6 @@ class MessageRead(SQLModel):
 
 class ConversationDetail(ConversationRead):
     messages: List[MessageRead]= []
+
+class MessageCreate(SQLModel):
+    content: str

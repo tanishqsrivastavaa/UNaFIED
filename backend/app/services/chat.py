@@ -1,8 +1,11 @@
 import uuid
 from typing import List, Sequence
 from sqlmodel import Session, select, desc
-from ..models.chats import Conversation
-from ..schemas.chat import ConversationCreate
+from ..models.chats import Conversation,Message
+from ..schemas.chat import ConversationCreate,MessageCreate
+from ..agents.chat_agent import chat_agent
+
+
 
 class ChatService:
     @staticmethod
@@ -50,3 +53,46 @@ class ChatService:
             Conversation.user_id==user_id
         )
         return session.exec(statement=statement).first()
+    
+    @staticmethod
+    async def process_chat_message(
+        session: Session,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        message_in: MessageCreate
+    ) -> Message:
+        
+
+        statement= select(Conversation).where(
+            Conversation.id==conversation_id,
+            Conversation.user_id==user_id
+        )
+
+        conversation= session.exec(statement).first()
+
+        if not conversation:
+            raise ValueError("Conversation not found or access denied!")
+        
+        user_message= Message(
+            conversation_id=conversation_id,
+            role="user",
+            content= message_in.content
+        )
+
+        session.add(user_message)
+        session.commit()
+        session.refresh(user_message)
+
+        result= await chat_agent.run(message_in.content,deps=message_in.content)
+
+        assistant_message= Message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content=result.output
+        )
+
+        session.add(assistant_message)
+        session.commit()
+        session.refresh(assistant_message)
+
+        return assistant_message
