@@ -48,3 +48,7 @@
     [X] Import the new chat router.
 
     [X] Include the router with the prefix /api/v1/chats and tag ["Chats"].
+
+## Phase 3: Agent & Tooling Engine
+
+### User Input -> Save to DB -> Trigger Agent -> Save Response -> Return to user
