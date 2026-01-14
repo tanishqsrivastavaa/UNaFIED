@@ -1,10 +1,10 @@
 import uuid
 from typing import List, Sequence
-from sqlmodel import Session, select, desc
+from sqlmodel import Session, select, desc,asc
 from ..models.chats import Conversation,Message
 from ..schemas.chat import ConversationCreate,MessageCreate
 from ..agents.chat_agent import chat_agent
-from pydantic_ai import ModelMessage,ModelResponse,ModelRequest,TextPart
+from pydantic_ai import ModelMessage,ModelResponse,ModelRequest,TextPart,UserPromptPart
 
 
 
@@ -84,7 +84,7 @@ class ChatService:
         session.commit()
         session.refresh(user_message)
 
-        result= await chat_agent.run(message_in.content,deps=message_in.content)
+        result= chat_agent.run_sync(message_in.content,deps=message_in.content)
 
         assistant_message= Message(
             conversation_id=conversation_id,
@@ -104,7 +104,7 @@ class ChatService:
         statement=(
             select(Message)
             .where(Message.conversation_id==conversation_id)
-            .order_by(Message.created_at.asc())
+            .order_by(asc(Message.created_at))
         )
 
         db_messages= session.exec(statement).all()
@@ -114,6 +114,8 @@ class ChatService:
 
         for msg in db_messages:
             if msg.role=="user":
-                history.append(ModelRequest(parts=[TextPart(content=msg.content)]))
+                history.append(ModelRequest(parts=[UserPromptPart(content=msg.content)]))
             elif msg.role=="assistant":
                 history.append(ModelResponse(parts=[TextPart(content=msg.content)]))
+
+        return history
