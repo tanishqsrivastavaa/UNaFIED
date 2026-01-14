@@ -4,6 +4,7 @@ from sqlmodel import Session, select, desc
 from ..models.chats import Conversation,Message
 from ..schemas.chat import ConversationCreate,MessageCreate
 from ..agents.chat_agent import chat_agent
+from pydantic_ai import ModelMessage,ModelResponse,ModelRequest,TextPart
 
 
 
@@ -96,3 +97,23 @@ class ChatService:
         session.refresh(assistant_message)
 
         return assistant_message
+    
+    @staticmethod
+    def get_chat_history(session:Session, conversation_id:uuid.UUID) -> list[ModelMessage]:
+
+        statement=(
+            select(Message)
+            .where(Message.conversation_id==conversation_id)
+            .order_by(Message.created_at.asc())
+        )
+
+        db_messages= session.exec(statement).all()
+
+
+        history: list[ModelMessage] = []
+
+        for msg in db_messages:
+            if msg.role=="user":
+                history.append(ModelRequest(parts=[TextPart(content=msg.content)]))
+            elif msg.role=="assistant":
+                history.append(ModelResponse(parts=[TextPart(content=msg.content)]))
