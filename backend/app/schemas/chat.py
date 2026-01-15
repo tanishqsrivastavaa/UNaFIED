@@ -16,6 +16,7 @@ class MessageRead(SQLModel):
     id: uuid.UUID
     role: str
     content: str
+    suggestion: dict | None=None
     created_at: datetime
 
 class ConversationDetail(ConversationRead):
