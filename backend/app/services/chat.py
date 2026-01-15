@@ -116,8 +116,10 @@ class ChatService:
             if msg.role=="user":
                 history.append(ModelRequest(parts=[UserPromptPart(content=msg.content)]))
             elif msg.role=="assistant":
-                history.append(ModelResponse(parts=[TextPart(content=msg.content)],finish_reason="stop"))
-
+                full_content= msg.content
+                if msg.suggestion:
+                    full_content+= f"\n\n[SYSTEM MEMORY: You suggested action'{msg.suggestion.get('label')}' using tool '{msg.suggestion.get('tool_name')}'.]"
+                history.append(ModelResponse(parts=[TextPart(content=full_content)]))
         return history
     
 
