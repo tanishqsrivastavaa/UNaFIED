@@ -164,6 +164,13 @@ class ChatService:
 
         agent_response_obj= result.output
 
+        suggestion_data= None
+
+        
+        if agent_response_obj.suggestion:
+            suggestion_data= agent_response_obj.suggestion.model_dump()
+
+
 
         text_content= agent_response_obj.chat_message
 
@@ -171,7 +178,8 @@ class ChatService:
         assistant_message= Message(
             conversation_id=conversation_id,
             role="assistant",
-            content=text_content
+            content=text_content,
+            suggestion=suggestion_data
         )
 
         session.add(assistant_message)
