@@ -162,14 +162,23 @@ class ChatService:
             deps=message_in.content
         )
 
+        agent_response_obj= result.output
+
+
+        text_content= agent_response_obj.chat_message
+
+
         assistant_message= Message(
             conversation_id=conversation_id,
             role="assistant",
-            content=result.output
+            content=text_content
         )
 
         session.add(assistant_message)
         session.commit()
         session.refresh(assistant_message)
 
+
+        # TODO: You might want to return 'agent_response_obj' to the API 
+        # so the frontend sees the suggestion.
         return assistant_message
