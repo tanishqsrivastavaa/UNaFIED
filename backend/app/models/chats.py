@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, Field, Relationship, Column
+from sqlmodel import SQLModel, Field, Relationship, Column, JSON
 from pgvector.sqlalchemy import Vector
 import uuid
 from datetime import datetime
@@ -20,6 +20,7 @@ class Message(SQLModel, table=True):
     conversation_id: uuid.UUID= Field(foreign_key="conversation.id",index=True)
     role: str
     content: str
+    suggestion: Optional[dict]= Field(default_factory=None,sa_column=Column(JSON))
     token_count: Optional[int]= None
     created_at: datetime= Field(default_factory=datetime.now)
 
