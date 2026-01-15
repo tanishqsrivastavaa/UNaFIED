@@ -39,8 +39,8 @@ chat_agent= Agent(
         model_name="llama-3.3-70b-versatile",
         provider=GroqProvider(api_key=GROQ_API_KEY)),
         system_prompt=prompt,
-        result_type=AgentResponse,
         tools=[get_weather],
+        output_type=AgentResponse,
         deps_type=str
         )
 
