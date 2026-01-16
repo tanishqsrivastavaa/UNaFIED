@@ -11,6 +11,6 @@ app.include_router(users.router,prefix="/api/v1",tags=["users"])
 app.include_router(chat.router,prefix="/chat",tags=["chats"])
 
 
-@app.get("/healthcheck")
+@app.get("/health")
 def health() -> dict[str,str]:
     return {"status":"ok"}
