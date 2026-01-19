@@ -1,10 +1,13 @@
 import uuid
 from typing import List, Sequence
 from sqlmodel import Session, select, desc,asc
-from ..models.chats import Conversation,Message
+from ..models.chats import Conversation,Message,MessageEmbedding
 from ..schemas.chat import ConversationCreate,MessageCreate
 from ..agents.chat_agent import chat_agent
+from ..services.embeddings import generate_embedding
+# from pgvector.sqlalchemy import cosine_distance
 from pydantic_ai import ModelMessage,ModelResponse,ModelRequest,TextPart,UserPromptPart
+
 
 
 
@@ -114,11 +117,19 @@ class ChatService:
 
         if history:
             history.pop()
+
+        rag_context= await ChatService.search_relevant_context(
+            session=session,
+            query_text=message_in.content,
+            conversation_id=conversation_id
+        )
+
+        augmented_prompt= f"{rag_context}\n\nUSER QUERY: {message_in.content}"
         
         result = await chat_agent.run(
-            message_in.content,
+            augmented_prompt,
             message_history= history,
-            deps=message_in.content
+            deps=augmented_prompt
         )
 
         agent_response_obj= result.output
@@ -149,3 +160,32 @@ class ChatService:
         # TODO: You might want to return 'agent_response_obj' to the API 
         # so the frontend sees the suggestion.
         return assistant_message
+    
+    @staticmethod
+    async def search_relevant_context(session:Session, query_text:str,conversation_id: uuid.UUID,limit:int = 3) -> str:
+
+        query_vector= await generate_embedding(query_text)
+
+        if not query_vector:
+            return ""
+        
+        statement= (
+            select(Message)
+            .join(MessageEmbedding)
+            .where(Message.conversation_id==conversation_id)
+            .order_by(MessageEmbedding.embedding.cosine_distance(query_vector)) # type: ignore
+            .limit(limit)
+        )
+
+        results= session.exec(statement).all()
+
+        if not results:
+            return ""
+        
+        context_str= "RELEVANT PAST MEMORIES:\n"
+
+        for msg in results:
+            context_str+= f"- [{msg.role.upper()}]: {msg.content}\n"
+
+        return context_str
+        
