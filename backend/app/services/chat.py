@@ -113,6 +113,18 @@ class ChatService:
         session.commit()
         session.refresh(user_message)
 
+
+        user_vector= await generate_embedding(message_in.content)
+
+        if user_vector:
+            user_embedding= MessageEmbedding(
+                message_id=user_message.id,
+                embedding=user_vector
+            )
+
+            session.add(user_embedding)
+            session.commit()
+
         history= ChatService.get_chat_history(session,conversation_id)
 
         if history:
@@ -121,7 +133,8 @@ class ChatService:
         rag_context= await ChatService.search_relevant_context(
             session=session,
             query_text=message_in.content,
-            conversation_id=conversation_id
+            conversation_id=conversation_id,
+            user_id=user_id
         )
 
         augmented_prompt= f"{rag_context}\n\nUSER QUERY: {message_in.content}"
@@ -162,7 +175,12 @@ class ChatService:
         return assistant_message
     
     @staticmethod
-    async def search_relevant_context(session:Session, query_text:str,conversation_id: uuid.UUID,limit:int = 3) -> str:
+    async def search_relevant_context(
+        session:Session,
+        query_text:str,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        limit:int = 3) -> str:
 
         query_vector= await generate_embedding(query_text)
 
@@ -172,7 +190,8 @@ class ChatService:
         statement= (
             select(Message)
             .join(MessageEmbedding)
-            .where(Message.conversation_id==conversation_id)
+            .join(Conversation)
+            .where(Conversation.user_id==user_id)
             .order_by(MessageEmbedding.embedding.cosine_distance(query_vector)) # type: ignore
             .limit(limit)
         )
