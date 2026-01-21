@@ -85,14 +85,19 @@ async def send_message(
         raise HTTPException(status_code=404, detail=str(e))
     
 
-@router.post("/{converstion_id}/stream")
+@router.post("/{conversation_id}/stream")
 async def stream_message(
-    conversation_id:uuid.UUID,
+    conversation_id: uuid.UUID,
     message_in: MessageCreate,
     session: Session = Depends(get_session),
-    user_id: uuid.UUID = Depends(get_current_user)
+    current_user: User = Depends(get_current_user) 
 ):
     return StreamingResponse(
-        ChatService.stream_chat_message(session, conversation_id,user_id,message_in),
+        ChatService.stream_chat_message(
+            session,
+            conversation_id,
+            current_user.id, 
+            message_in
+        ),
         media_type="application/x-ndjson"
     )
