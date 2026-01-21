@@ -1,6 +1,7 @@
 import uuid
 from typing import List,Any
 from fastapi import Depends,APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session
 
 from ...core.security import  get_current_user
@@ -82,3 +83,16 @@ async def send_message(
     
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
+
+@router.post("/{converstion_id}/stream")
+async def stream_message(
+    conversation_id:uuid.UUID,
+    message_in: MessageCreate,
+    session: Session = Depends(get_session),
+    user_id: uuid.UUID = Depends(get_current_user)
+):
+    return StreamingResponse(
+        ChatService.stream_chat_message(session, conversation_id,user_id,message_in),
+        media_type="application/x-ndjson"
+    )
