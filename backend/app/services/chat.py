@@ -1,4 +1,4 @@
-import uuid
+import uuid,json
 from typing import List, Sequence
 from sqlmodel import Session, select, desc,asc
 from ..models.chats import Conversation,Message,MessageEmbedding
@@ -218,7 +218,7 @@ class ChatService:
     ):
         
         """Validatin and setup"""
-        statement= select(Conversation).join(Conversation).where(
+        statement= select(Conversation).where(
             Conversation.id==conversation_id,
             Conversation.user_id==user_id
         )
@@ -261,19 +261,36 @@ class ChatService:
         async with chat_agent.run_stream(augmented_prompt,message_history=recent_history,deps=augmented_prompt) as result:
             accumulated_text= ""
             final_suggestion = None
+            last_text_length= 0
 
-            async for chunk in result.stream_output():
-                yield chunk.model_dump_json() + "\n"
-                accumulated_text = chunk.chat_message
-                final_suggestion = chunk.suggestion
+            async for partial_response in result.stream_output():
+                current_full_text= partial_response.chat_message or ""
+                
+                if len(current_full_text) > last_text_length:
+                    new_text= current_full_text[last_text_length:]
+                    last_text_length= len(current_full_text)
 
-            suggestion_data = final_suggestion.model_dump() if final_suggestion else None
+                    reponse_json= {
+                        "chat_message":new_text,
+                        "suggestion":None
+                    }
+                
+                    yield json.dumps(reponse_json) + "\n"
+                
+                if partial_response.suggestion:
+                    final_suggestion= partial_response.suggestion
+                
+                accumulated_text= current_full_text
+
+
+            suggestion_data= final_suggestion.model_dump() if final_suggestion else None
+
 
             assistant_message= Message(
                 conversation_id= conversation_id,
                 role= "assistant",
                 content=accumulated_text,
-                suggestion=suggestion_data
+                suggestion= suggestion_data
             )
 
             session.add(assistant_message)
