@@ -208,3 +208,84 @@ class ChatService:
 
         return context_str
         
+
+    @staticmethod
+    async def stream_chat_message(
+        session: Session,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        message_in: MessageCreate
+    ):
+        
+        """Validatin and setup"""
+        statement= select(Conversation).join(Conversation).where(
+            Conversation.id==conversation_id,
+            Conversation.user_id==user_id
+        )
+
+        conversation= session.exec(statement).first()
+
+        if not conversation:
+            raise ValueError("Conversation not found")
+        
+
+        """Saving User message immediately"""
+        user_message= Message(
+            conversation_id=conversation_id,
+            role="user",
+            content=message_in.content
+            )
+        
+        session.add(user_message)
+        session.commit()
+        session.refresh(user_message)
+
+        """Generating embedding from user's message"""
+
+        user_vector= await generate_embedding(message_in.content)
+
+        if user_vector:
+            session.add(MessageEmbedding(message_id=user_message.id,embedding=user_vector))
+            session.commit()
+
+        """RAG, prepping context"""
+        rag_context = await ChatService.search_relevant_context(session,message_in.content,conversation_id,user_id)
+
+        recent_history= ChatService.get_chat_history(session,conversation_id)
+
+        if recent_history:
+            recent_history.pop()
+
+        augmented_prompt = f"{rag_context}\n\nUSER QUERY: {message_in.content}"
+
+        async with chat_agent.run_stream(augmented_prompt,message_history=recent_history,deps=augmented_prompt) as result:
+            accumulated_text= ""
+            final_suggestion = None
+
+            async for chunk in result.stream_output():
+                yield chunk.model_dump_json() + "\n"
+                accumulated_text = chunk.chat_message
+                final_suggestion = chunk.suggestion
+
+            suggestion_data = final_suggestion.model_dump() if final_suggestion else None
+
+            assistant_message= Message(
+                conversation_id= conversation_id,
+                role= "assistant",
+                content=accumulated_text,
+                suggestion=suggestion_data
+            )
+
+            session.add(assistant_message)
+            session.commit()
+            session.refresh(assistant_message)
+
+
+            """Generating embedding of assisant's message"""
+
+            ai_vector= await generate_embedding(accumulated_text)
+
+            if ai_vector:
+                session.add(MessageEmbedding(message_id=assistant_message.id,embedding=ai_vector))
+                session.commit()
+
