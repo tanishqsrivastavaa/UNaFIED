@@ -52,3 +52,6 @@
 ## Phase 3: Agent & Tooling Engine
 
 ### User Input -> Save to DB -> Trigger Agent -> Save Response -> Return to user
+
+
+## Need to see what to work on now!!!
