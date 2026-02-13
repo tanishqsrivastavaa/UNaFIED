@@ -291,7 +291,7 @@ class ChatService:
                 role= "assistant",
                 content=accumulated_text,
                 suggestion= suggestion_data
-            )
+            )   
 
             session.add(assistant_message)
             session.commit()
