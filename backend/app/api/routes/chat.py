@@ -33,16 +33,16 @@ def create_conversation(
     )
 
 
-@router.get("/",response_model=List[ConversationRead])
+@router.get("/")
 def read_conversations(
-    skip:int = 0,
-    limit:int = 20,
-    current_user: User= Depends(get_current_user),
-    session: Session= Depends(get_session)
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
 ):
     return ChatService.get_user_conversations(
         session=session,
-        user_id= current_user.id,
+        user_id=current_user.id,
         skip=skip,
         limit=limit
     )
@@ -62,8 +62,23 @@ def get_conversation(
 
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
+
     return conversation
+
+
+@router.delete("/{conversation_id}", status_code=204)
+def delete_conversation(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    deleted = ChatService.delete_conversation(
+        session=session,
+        user_id=current_user.id,
+        conversation_id=conversation_id
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation not found")
 
 @router.post("/{conversation_id}/messages",response_model=MessageRead)
 async def send_message(
