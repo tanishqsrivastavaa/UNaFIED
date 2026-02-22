@@ -1,6 +1,6 @@
-import uuid,json
+import uuid, json
 from typing import List, Sequence
-from sqlmodel import Session, select, desc,asc
+from sqlmodel import Session, select, desc, asc, func
 from ..models.chats import Conversation,Message,MessageEmbedding
 from ..schemas.chat import ConversationCreate,MessageCreate
 from ..agents.chat_agent import chat_agent
@@ -35,28 +35,46 @@ class ChatService:
         session: Session,
         user_id: uuid.UUID,
         skip: int = 0,
-        limit: int = 20) -> Sequence[Conversation]:
+        limit: int = 20) -> dict:
 
-        statement= (
+        total = session.exec(
+            select(func.count()).select_from(Conversation).where(Conversation.user_id == user_id)
+        ).one()
+
+        statement = (
             select(Conversation)
-            .where(Conversation.user_id==user_id)
+            .where(Conversation.user_id == user_id)
             .order_by(desc(Conversation.updated_at))
             .offset(skip)
             .limit(limit)
         )
-        return session.exec(statement).all()
-    
+        items = session.exec(statement).all()
+        return {"items": items, "total": total}
+
     @staticmethod
     def get_conversation(
         session: Session,
         user_id: uuid.UUID,
         conversation_id: uuid.UUID
     ) -> Conversation | None:
-        statement= select(Conversation).where(
-            Conversation.id==conversation_id,
-            Conversation.user_id==user_id
+        statement = select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id
         )
         return session.exec(statement=statement).first()
+
+    @staticmethod
+    def delete_conversation(
+        session: Session,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID
+    ) -> bool:
+        conversation = ChatService.get_conversation(session, user_id, conversation_id)
+        if not conversation:
+            return False
+        session.delete(conversation)
+        session.commit()
+        return True
     
     @staticmethod
     def get_chat_history(session:Session, conversation_id:uuid.UUID) -> list[ModelMessage]:
@@ -305,4 +323,3 @@ class ChatService:
             if ai_vector:
                 session.add(MessageEmbedding(message_id=assistant_message.id,embedding=ai_vector))
                 session.commit()
-

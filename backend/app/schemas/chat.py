@@ -1,10 +1,10 @@
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, Field
 from datetime import datetime
 from typing import List
 import uuid
 
 class ConversationCreate(SQLModel):
-    title: str | None=None
+    title: str | None = None
 
 class ConversationRead(SQLModel):
     id: uuid.UUID
@@ -16,11 +16,11 @@ class MessageRead(SQLModel):
     id: uuid.UUID
     role: str
     content: str
-    suggestion: dict | None=None
+    suggestion: dict | None = None
     created_at: datetime
 
 class ConversationDetail(ConversationRead):
-    messages: List[MessageRead]= []
+    messages: List[MessageRead] = []
 
 class MessageCreate(SQLModel):
-    content: str
+    content: str = Field(min_length=1, max_length=4000)
