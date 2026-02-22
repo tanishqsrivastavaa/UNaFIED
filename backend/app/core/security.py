@@ -1,10 +1,11 @@
-from fastapi import Depends,HTTPException
-from sqlmodel import Session,select
 import os
+import hashlib
+from fastapi import Depends, HTTPException
+from sqlmodel import Session, select
 from dotenv import load_dotenv
 import jwt
 from jwt import PyJWTError
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi.security import HTTPBearer
 from passlib.context import CryptContext
 from typing import Any
@@ -13,74 +14,92 @@ from app.models.user import User
 
 load_dotenv()
 
-SECRET_KEY= os.getenv("SECRET_AUTH_KEY")
+SECRET_KEY = os.getenv("SECRET_AUTH_KEY")
+REFRESH_SECRET_KEY = os.getenv("REFRESH_SECRET_KEY", SECRET_KEY + "_refresh")
 
-#first we decide what algorithm we are going to use
-ALGORITHM= "HS256"
-
-#now we decide how long the token is alive for
-ACCESS_TOKEN_TIME_LIMIT= 15 #15 minutes
+ALGORITHM = "HS256"
+ACCESS_TOKEN_TIME_LIMIT = 15  # 15 minutes
+REFRESH_TOKEN_TIME_LIMIT = 60 * 24 * 7  # 7 days
 
 bearer_scheme = HTTPBearer()
 
+# --- Password Hashing ---
 
-#first we will work on hashing the password
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-pwd_content = CryptContext(schemes=["bcrypt"],deprecated="auto")
+
+def hash_token(raw_token: str) -> str:
+    """Return a SHA-256 hex digest of the token — stored in DB, never the raw value."""
+    return hashlib.sha256(raw_token.encode()).hexdigest()
+
+
 def get_password_hash(password: str) -> str:
-    return pwd_content.hash(password)
-
-#now we will verify the hashed password
-def verify_password_hash(plain_password: str,hash_password: str) -> bool:
-    return pwd_content.verify(plain_password,hash_password)
+    return pwd_context.hash(password)
 
 
-"""now lets work on the token creation, verification, and getting current user"""
+def verify_password_hash(plain_password: str, hash_password: str) -> bool:
+    return pwd_context.verify(plain_password, hash_password)
 
-def create_token(data: dict, expires_detla: timedelta | None=None) -> str:
-    
+
+# --- Token Creation & Verification ---
+
+
+def create_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-
-    if expires_detla:
-        expire = datetime.now() + expires_detla
-    else:
-        expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_TIME_LIMIT)
-
-    to_encode.update({"exp":expire})
-
-    encoded_jwt = jwt.encode(to_encode,SECRET_KEY,ALGORITHM)
-    return encoded_jwt
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_TIME_LIMIT)
+    )
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, ALGORITHM)
 
 
-def verify_token(token: str) -> dict[str,Any]:
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_TIME_LIMIT)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, REFRESH_SECRET_KEY, ALGORITHM)
+
+
+def verify_token(token: str) -> dict[str, Any]:
     try:
-        payload = jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except PyJWTError:
-        raise HTTPException(status_code=401,detail="Could not validate credentials")
-    
-#now we make the function to get current user
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 
-def get_current_user(token: str = Depends(bearer_scheme),session: Session =Depends(get_session)):
+def verify_refresh_token(token: str) -> dict[str, Any]:
+    try:
+        payload = jwt.decode(token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        return payload
+    except PyJWTError:
+        raise HTTPException(status_code=401, detail="Could not validate refresh token")
 
+
+# --- Get Current User ---
+
+
+def get_current_user(
+    token: str = Depends(bearer_scheme),
+    session: Session = Depends(get_session),
+):
     try:
         token_string = token.credentials
-        payload = jwt.decode(token_string,SECRET_KEY,algorithms=[ALGORITHM])
+        payload = jwt.decode(token_string, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
-        
+
         if user_id is None:
-            raise HTTPException(status_code=401,detail="Invalid authentication credentials")
-        
-        user = session.exec(select(User).where(User.id==user_id)).first()
-        if user is None:
             raise HTTPException(
-                status_code=401,
-                detail="User not found"
+                status_code=401, detail="Invalid authentication credentials"
             )
+
+        user = session.exec(select(User).where(User.id == user_id)).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
         return user
     except PyJWTError:
         raise HTTPException(
-            status_code=401,
-            detail="Could not validate credentials"
+            status_code=401, detail="Could not validate credentials"
         )
