@@ -6,6 +6,7 @@ from sqlmodel import SQLModel
 from alembic import context
 from app.models.user import User
 from app.models.chats import Conversation, Message, MessageEmbedding
+from app.models.token import RefreshToken
 from pgvector.sqlalchemy import Vector
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
