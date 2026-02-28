@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlmodel import Session
+from ...core.redis import get_redis
 from ...core.security import get_current_user
 from ...db.db import get_session
 from ...models.user import User
@@ -55,5 +56,7 @@ async def logout(body: RefreshRequest, session: Session = Depends(get_session)):
 
 
 @router.get("/me")
-async def read_users_me(current_user: User = Depends(get_current_user)):
+async def read_users_me(
+    current_user: User = Depends(get_current_user),
+    redis = Depends(get_redis)):
     return current_user
