@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
     DATABASE_URL: str
     SECRET_AUTH_KEY: str
+    OPENAI_API_KEY: str
+    REDIS_URL: str
+
 
     class Config:
         env_file= ".env"

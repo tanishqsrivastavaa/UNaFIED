@@ -31,17 +31,6 @@ _SAFE_EXPR_RE = re.compile(
 
 
 def calculator(expression: str) -> str:
-    """Evaluate a mathematical expression safely.
-
-    Supports basic arithmetic (+, -, *, /, **, %), parentheses,
-    and common math functions (sqrt, sin, cos, tan, log, abs, round, pow, ceil, floor).
-
-    Args:
-        expression: The mathematical expression to evaluate, e.g. "sqrt(144) + 3**2"
-
-    Returns:
-        The result as a string, or an error message.
-    """
     expr = expression.replace("^", "**")
     try:
         result = eval(expr, {"__builtins__": {}}, _SAFE_MATH_NAMES)  # noqa: S307
@@ -53,10 +42,6 @@ def calculator(expression: str) -> str:
 
 
 def get_datetime() -> str:
-    """Return the current date and time in UTC.
-
-    Useful when the user asks what day/time it is, or when scheduling tasks.
-    """
     now = datetime.now(timezone.utc)
     return now.strftime("%A, %B %d, %Y at %H:%M UTC")
 
