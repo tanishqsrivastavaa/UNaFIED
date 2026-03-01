@@ -4,9 +4,10 @@ from fastapi import Depends,APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session
 
-from ...core.security import  get_current_user
+from ...core.security import  get_current_user_hashed
 from ...db.db import get_session
 from ...models.user import User
+from ...services.chat import ChatService
 from ...schemas.chat import (
     ConversationCreate,
     ConversationRead,
@@ -15,7 +16,7 @@ from ...schemas.chat import (
     MessageRead
 )
 
-from ...services.chat import ChatService
+
 
 
 router = APIRouter(tags=["chats"])
@@ -23,7 +24,7 @@ router = APIRouter(tags=["chats"])
 @router.post("/",response_model=ConversationRead)
 def create_conversation(
     conversation_in: ConversationCreate,
-    current_user: User= Depends(get_current_user),
+    current_user: User= Depends(get_current_user_hashed),
     session: Session= Depends(get_session)
 ):
     return ChatService.create_conversation(
@@ -37,7 +38,7 @@ def create_conversation(
 def read_conversations(
     skip: int = 0,
     limit: int = 20,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_hashed),
     session: Session = Depends(get_session)
 ):
     return ChatService.get_user_conversations(
@@ -51,7 +52,7 @@ def read_conversations(
 @router.get("/{conversation_id}",response_model=ConversationDetail)
 def get_conversation(
     conversation_id: uuid.UUID,
-    current_user: User= Depends(get_current_user),
+    current_user: User= Depends(get_current_user_hashed),
     session: Session= Depends(get_session)
 ):
     conversation= ChatService.get_conversation(
@@ -69,7 +70,7 @@ def get_conversation(
 @router.delete("/{conversation_id}", status_code=204)
 def delete_conversation(
     conversation_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_hashed),
     session: Session = Depends(get_session)
 ):
     deleted = ChatService.delete_conversation(
@@ -84,7 +85,7 @@ def delete_conversation(
 async def send_message(
     conversation_id: uuid.UUID,
     message_in: MessageCreate,
-    current_user: User= Depends(get_current_user),
+    current_user: User= Depends(get_current_user_hashed),
     session: Session= Depends(get_session)
 ) -> Any:
     
@@ -105,7 +106,7 @@ async def stream_message(
     conversation_id: uuid.UUID,
     message_in: MessageCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user) 
+    current_user: User = Depends(get_current_user_hashed) 
 ):
     return StreamingResponse(
         ChatService.stream_chat_message(
