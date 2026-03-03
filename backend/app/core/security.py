@@ -70,7 +70,7 @@ def verify_token(token: str) -> dict[str, Any]:
 
 def verify_refresh_token(token: str) -> dict[str, Any]:
     try:
-        payload = jwt.decode(token, REFRESH_SECRET_AUTH_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
         return payload
@@ -128,7 +128,7 @@ async def get_current_user_hashed(
     user = session.exec(select(User).where(User.id==user_id)).first()
 
     if not user:
-        raise HTTPException(statuscode=401,detail="User not found")
+        raise HTTPException(status_code=401,detail="User not found")
     
     await redis.setex(cache_key,300,user.model_dump_json())
 

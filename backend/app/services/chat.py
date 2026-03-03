@@ -159,24 +159,22 @@ class ChatService:
         
         result = await chat_agent.run(
             augmented_prompt,
-            message_history= history,
+            message_history=history,
             deps=augmented_prompt
         )
 
-        agent_response_obj= result.output
+        raw = result.output  # now a plain string since output_type=str
 
-        suggestion_data= None
+        # Parse the JSON string the model returns
+        try:
+            parsed = json.loads(raw)
+            text_content = parsed.get("chat_message", raw)
+            suggestion_data = parsed.get("suggestion")
+        except json.JSONDecodeError:
+            text_content = raw
+            suggestion_data = None
 
-        
-        if agent_response_obj.suggestion:
-            suggestion_data= agent_response_obj.suggestion.model_dump()
-
-
-
-        text_content= agent_response_obj.chat_message
-
-
-        assistant_message= Message(
+        assistant_message = Message(
             conversation_id=conversation_id,
             role="assistant",
             content=text_content,
@@ -187,9 +185,6 @@ class ChatService:
         session.commit()
         session.refresh(assistant_message)
 
-
-        # TODO: You might want to return 'agent_response_obj' to the API 
-        # so the frontend sees the suggestion.
         return assistant_message
     
     @staticmethod
@@ -276,50 +271,46 @@ class ChatService:
 
         augmented_prompt = f"{rag_context}\n\nUSER QUERY: {message_in.content}"
 
-        async with chat_agent.run_stream(augmented_prompt,message_history=recent_history,deps=augmented_prompt) as result:
-            accumulated_text= ""
-            final_suggestion = None
-            last_text_length= 0
+        async with chat_agent.run_stream(augmented_prompt, message_history=recent_history, deps=augmented_prompt) as result:
+            accumulated_text = ""
+            last_text_length = 0
 
-            async for partial_response in result.stream_output():
-                current_full_text= partial_response.chat_message or ""
-                
+            async for chunk in result.stream_output():
+                # output_type=str, so chunk is a plain string (accumulated so far)
+                current_full_text = chunk or ""
+
                 if len(current_full_text) > last_text_length:
-                    new_text= current_full_text[last_text_length:]
-                    last_text_length= len(current_full_text)
+                    new_text = current_full_text[last_text_length:]
+                    last_text_length = len(current_full_text)
 
-                    reponse_json= {
-                        "chat_message":new_text,
-                        "suggestion":None
-                    }
-                
-                    yield json.dumps(reponse_json) + "\n"
-                
-                if partial_response.suggestion:
-                    final_suggestion= partial_response.suggestion
-                
-                accumulated_text= current_full_text
+                    yield json.dumps({"chat_message": new_text, "suggestion": None}) + "\n"
 
+                accumulated_text = current_full_text
 
-            suggestion_data= final_suggestion.model_dump() if final_suggestion else None
+            # After streaming is done, try to parse the full accumulated text as JSON
+            suggestion_data = None
+            final_text = accumulated_text
+            try:
+                parsed = json.loads(accumulated_text)
+                final_text = parsed.get("chat_message", accumulated_text)
+                suggestion_data = parsed.get("suggestion")
+            except json.JSONDecodeError:
+                pass
 
-
-            assistant_message= Message(
-                conversation_id= conversation_id,
-                role= "assistant",
-                content=accumulated_text,
-                suggestion= suggestion_data
-            )   
+            assistant_message = Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=final_text,
+                suggestion=suggestion_data
+            )
 
             session.add(assistant_message)
             session.commit()
             session.refresh(assistant_message)
 
-
-            """Generating embedding of assisant's message"""
-
-            ai_vector= await generate_embedding(accumulated_text)
+            """Generating embedding of assistant's message"""
+            ai_vector = await generate_embedding(final_text)
 
             if ai_vector:
-                session.add(MessageEmbedding(message_id=assistant_message.id,embedding=ai_vector))
+                session.add(MessageEmbedding(message_id=assistant_message.id, embedding=ai_vector))
                 session.commit()
