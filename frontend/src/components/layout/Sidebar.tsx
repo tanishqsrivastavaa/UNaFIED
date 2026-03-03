@@ -3,51 +3,51 @@ import { useAuthStore } from "../../stores/authStore";
 import { useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
-    const user = useAuthStore((s) => s.user);
-    const logoutFn = useAuthStore((s) => s.logout);
-    const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const logoutFn = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
 
-    const handleLogout = async () => {
-        await logoutFn();
-        navigate("/login");
-    };
+  const handleLogout = async () => {
+    await logoutFn();
+    navigate("/login");
+  };
 
-    return (
-        <aside className="sidebar">
-            {/* Logo */}
-            <div className="sidebar-logo">
-                <span>UNaFIED</span>
-            </div>
+  return (
+    <aside className="sidebar">
+      {/* Logo */}
+      <div className="sidebar-logo">
+        <span>UNaFIED</span>
+      </div>
 
-            {/* Navigation */}
-            <nav className="sidebar-nav">
-                <button className="sidebar-link active">
-                    <MessageSquare size={18} />
-                    <span>Chats</span>
-                </button>
-                <button className="sidebar-link">
-                    <Settings size={18} />
-                    <span>Settings</span>
-                </button>
-            </nav>
+      {/* Navigation */}
+      <nav className="sidebar-nav">
+        <button className="sidebar-link active">
+          <MessageSquare size={18} />
+          <span>Chats</span>
+        </button>
+        <button className="sidebar-link">
+          <Settings size={18} />
+          <span>Settings</span>
+        </button>
+      </nav>
 
-            {/* Spacer */}
-            <div style={{ flex: 1 }} />
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
 
-            {/* User Info */}
-            <div className="sidebar-user">
-                <div className="sidebar-avatar">
-                    {user?.email?.charAt(0).toUpperCase()}
-                </div>
-                <div className="sidebar-user-info">
-                    <span className="sidebar-email">{user?.email}</span>
-                </div>
-                <button className="sidebar-logout" onClick={handleLogout} title="Logout">
-                    <LogOut size={16} />
-                </button>
-            </div>
+      {/* User Info */}
+      <div className="sidebar-user">
+        <div className="sidebar-avatar">
+          {user?.email?.charAt(0).toUpperCase()}
+        </div>
+        <div className="sidebar-user-info">
+          <span className="sidebar-email">{user?.email}</span>
+        </div>
+        <button className="sidebar-logout" onClick={handleLogout} title="Logout">
+          <LogOut size={16} />
+        </button>
+      </div>
 
-            <style>{`
+      <style>{`
         .sidebar {
           width: 200px;
           min-width: 200px;
@@ -56,6 +56,7 @@ export default function Sidebar() {
           display: flex;
           flex-direction: column;
           padding: 1.25rem 0.75rem;
+          border-right: 1px solid #333;
         }
         .sidebar-logo {
           padding: 0 0.5rem;
@@ -141,6 +142,6 @@ export default function Sidebar() {
           color: #fff;
         }
       `}</style>
-        </aside>
-    );
+    </aside>
+  );
 }

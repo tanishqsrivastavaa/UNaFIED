@@ -2,107 +2,107 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import {
-    getConversations,
-    createConversation,
-    deleteConversation,
-    type Conversation,
+  getConversations,
+  createConversation,
+  deleteConversation,
+  type Conversation,
 } from "../../lib/api";
 
 export default function ChatList() {
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
-    const { conversationId } = useParams();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { conversationId } = useParams();
 
-    const fetchConversations = async () => {
-        try {
-            const data = await getConversations();
-            setConversations(data.items);
-        } catch {
-            // silently fail — user will see empty list
-        } finally {
-            setLoading(false);
-        }
-    };
+  const fetchConversations = async () => {
+    try {
+      const data = await getConversations();
+      setConversations(data.items);
+    } catch {
+      // silently fail — user will see empty list
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    useEffect(() => {
-        fetchConversations();
-    }, []);
+  useEffect(() => {
+    fetchConversations();
+  }, []);
 
-    const handleNew = async () => {
-        try {
-            const newConvo = await createConversation();
-            setConversations((prev) => [newConvo, ...prev]);
-            navigate(`/chat/${newConvo.id}`);
-        } catch {
-            // handled
-        }
-    };
+  const handleNew = async () => {
+    try {
+      const newConvo = await createConversation();
+      setConversations((prev) => [newConvo, ...prev]);
+      navigate(`/chat/${newConvo.id}`);
+    } catch {
+      // handled
+    }
+  };
 
-    const handleDelete = async (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
-        try {
-            await deleteConversation(id);
-            setConversations((prev) => prev.filter((c) => c.id !== id));
-            if (conversationId === id) navigate("/chat");
-        } catch {
-            // handled
-        }
-    };
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await deleteConversation(id);
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (conversationId === id) navigate("/chat");
+    } catch {
+      // handled
+    }
+  };
 
-    const timeAgo = (dateStr: string) => {
-        const diff = Date.now() - new Date(dateStr).getTime();
-        const mins = Math.floor(diff / 60000);
-        if (mins < 1) return "now";
-        if (mins < 60) return `${mins}m`;
-        const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs}h`;
-        return `${Math.floor(hrs / 24)}d`;
-    };
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "now";
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    return `${Math.floor(hrs / 24)}d`;
+  };
 
-    return (
-        <div className="chatlist">
-            <div className="chatlist-header">
-                <h2>Chats</h2>
-                <button className="chatlist-new" onClick={handleNew} title="New Chat">
-                    <Plus size={18} />
-                </button>
-            </div>
+  return (
+    <div className="chatlist">
+      <div className="chatlist-header">
+        <h2>Chats</h2>
+        <button className="chatlist-new" onClick={handleNew} title="New Chat">
+          <Plus size={18} />
+        </button>
+      </div>
 
-            <div className="chatlist-items">
-                {loading ? (
-                    <p className="chatlist-empty">Loading…</p>
-                ) : conversations.length === 0 ? (
-                    <p className="chatlist-empty">No conversations yet</p>
-                ) : (
-                    conversations.map((convo) => (
-                        <button
-                            key={convo.id}
-                            className={`chatlist-item ${conversationId === convo.id ? "active" : ""}`}
-                            onClick={() => navigate(`/chat/${convo.id}`)}
-                        >
-                            <div className="chatlist-item-content">
-                                <span className="chatlist-title">{convo.title || "New Chat"}</span>
-                                <span className="chatlist-time">{timeAgo(convo.updated_at)}</span>
-                            </div>
-                            <button
-                                className="chatlist-delete"
-                                onClick={(e) => handleDelete(e, convo.id)}
-                                title="Delete"
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        </button>
-                    ))
-                )}
-            </div>
+      <div className="chatlist-items">
+        {loading ? (
+          <p className="chatlist-empty">Loading…</p>
+        ) : conversations.length === 0 ? (
+          <p className="chatlist-empty">No conversations yet</p>
+        ) : (
+          conversations.map((convo) => (
+            <button
+              key={convo.id}
+              className={`chatlist-item ${conversationId === convo.id ? "active" : ""}`}
+              onClick={() => navigate(`/chat/${convo.id}`)}
+            >
+              <div className="chatlist-item-content">
+                <span className="chatlist-title">{convo.title || "New Chat"}</span>
+                <span className="chatlist-time">{timeAgo(convo.updated_at)}</span>
+              </div>
+              <button
+                className="chatlist-delete"
+                onClick={(e) => handleDelete(e, convo.id)}
+                title="Delete"
+              >
+                <Trash2 size={14} />
+              </button>
+            </button>
+          ))
+        )}
+      </div>
 
-            <style>{`
+      <style>{`
         .chatlist {
           width: 280px;
           min-width: 280px;
           height: 100vh;
-          border-right: 1px solid var(--color-border);
+          border-right: 1px solid #111;
           display: flex;
           flex-direction: column;
           background: #fff;
@@ -205,6 +205,6 @@ export default function ChatList() {
           color: #d44 !important;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

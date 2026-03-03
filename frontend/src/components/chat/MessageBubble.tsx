@@ -1,38 +1,38 @@
 import type { Message } from "../../lib/api";
 
 interface Props {
-    message: Message;
+  message: Message;
 }
 
 export default function MessageBubble({ message }: Props) {
-    const isUser = message.role === "user";
+  const isUser = message.role === "user";
 
-    const formatTime = (dateStr: string) => {
-        return new Date(dateStr).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
-    return (
-        <div className={`bubble-row ${isUser ? "bubble-user" : "bubble-ai"}`}>
-            {!isUser && (
-                <div className="bubble-avatar">
-                    <span>U</span>
-                </div>
-            )}
+  return (
+    <div className={`bubble-row ${isUser ? "bubble-user" : "bubble-ai"}`}>
+      {!isUser && (
+        <div className="bubble-avatar">
+          <span>U</span>
+        </div>
+      )}
 
-            <div className="bubble-content">
-                {!isUser && <span className="bubble-name">UNaFIED</span>}
-                <div className={`bubble ${isUser ? "bubble-right" : "bubble-left"}`}>
-                    {message.content}
-                </div>
-                <span className="bubble-time">
-                    {message.created_at ? formatTime(message.created_at) : ""}
-                </span>
-            </div>
+      <div className="bubble-content">
+        {!isUser && <span className="bubble-name">UNaFIED</span>}
+        <div className={`bubble ${isUser ? "bubble-right" : "bubble-left"}`}>
+          {message.content}
+        </div>
+        <span className="bubble-time">
+          {message.created_at ? formatTime(message.created_at) : ""}
+        </span>
+      </div>
 
-            <style>{`
+      <style>{`
         .bubble-row {
           display: flex;
           gap: 0.6rem;
@@ -79,11 +79,13 @@ export default function MessageBubble({ message }: Props) {
         }
         .bubble-right {
           background: var(--color-bubble-user);
+          border: 1px solid var(--color-border);
           border-radius: 12px 12px 2px 12px;
           box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
         .bubble-left {
           background: var(--color-bubble-ai);
+          border: 1px solid var(--color-border);
           border-radius: 12px 12px 12px 2px;
         }
         .bubble-time {
@@ -95,6 +97,6 @@ export default function MessageBubble({ message }: Props) {
           text-align: right;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }
