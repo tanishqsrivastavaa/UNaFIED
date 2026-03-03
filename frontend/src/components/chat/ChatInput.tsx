@@ -2,71 +2,71 @@ import { useState, useRef, type KeyboardEvent } from "react";
 import { Send } from "lucide-react";
 
 interface Props {
-    onSend: (content: string) => void;
-    disabled?: boolean;
+  onSend: (content: string) => void;
+  disabled?: boolean;
 }
 
 export default function ChatInput({ onSend, disabled }: Props) {
-    const [value, setValue] = useState("");
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [value, setValue] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const handleSend = () => {
-        const trimmed = value.trim();
-        if (!trimmed || disabled) return;
-        onSend(trimmed);
-        setValue("");
+  const handleSend = () => {
+    const trimmed = value.trim();
+    if (!trimmed || disabled) return;
+    onSend(trimmed);
+    setValue("");
 
-        // Reset textarea height
-        if (textareaRef.current) {
-            textareaRef.current.style.height = "auto";
-        }
-    };
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-        }
-    };
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
-    const handleInput = () => {
-        const el = textareaRef.current;
-        if (el) {
-            el.style.height = "auto";
-            el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-        }
-    };
+  const handleInput = () => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    }
+  };
 
-    return (
-        <div className="chat-input-bar">
-            <textarea
-                ref={textareaRef}
-                className="chat-textarea"
-                placeholder="Message UNaFIED…"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onInput={handleInput}
-                rows={1}
-                maxLength={4000}
-                disabled={disabled}
-            />
-            <button
-                className="chat-send"
-                onClick={handleSend}
-                disabled={!value.trim() || disabled}
-                title="Send"
-            >
-                <Send size={18} />
-            </button>
+  return (
+    <div className="chat-input-bar">
+      <textarea
+        ref={textareaRef}
+        className="chat-textarea"
+        placeholder="Message UNaFIED…"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onInput={handleInput}
+        rows={1}
+        maxLength={4000}
+        disabled={disabled}
+      />
+      <button
+        className="chat-send"
+        onClick={handleSend}
+        disabled={!value.trim() || disabled}
+        title="Send"
+      >
+        <Send size={18} />
+      </button>
 
-            <style>{`
+      <style>{`
         .chat-input-bar {
           display: flex;
           align-items: flex-end;
           gap: 0.5rem;
           padding: 0.75rem 1.25rem;
-          border-top: 1px solid var(--color-border);
+          border-top: 1px solid #111;
           background: #fff;
         }
         .chat-textarea {
@@ -113,6 +113,6 @@ export default function ChatInput({ onSend, disabled }: Props) {
           cursor: not-allowed;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }
