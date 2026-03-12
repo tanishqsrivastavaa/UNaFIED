@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     SECRET_AUTH_KEY: str
     OPENAI_API_KEY: str
     REDIS_URL: str
-
+    GOOGLE_CLIENT_ID: str | None = None
 
     class Config:
         env_file= ".env"
