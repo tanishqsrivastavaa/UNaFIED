@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     REDIS_URL: str
     GOOGLE_CLIENT_ID: str | None = None
-
+    GOOGLE_CLIENT_SECRET: str | None = None
     class Config:
         env_file= ".env"
         env_file_encoding= "utf-8"
