@@ -33,7 +33,11 @@ async def create_user(user_data: UserCreate, session: Session) -> User | None:
 async def authenticate_user(body: LoginRequest, session: Session) -> dict | None:
     user = session.exec(select(User).where(User.email == body.email)).first()
 
-    if not user or not verify_password_hash(body.password, user.hashed_password):
+    if (
+        not user
+        or not user.hashed_password
+        or not verify_password_hash(body.password, user.hashed_password)
+    ):
         return None
 
     access_token = create_token({"sub": str(user.id)})
@@ -43,7 +47,8 @@ async def authenticate_user(body: LoginRequest, session: Session) -> dict | None
     token_record = RefreshToken(
         user_id=user.id,
         token_hash=hash_token(raw_refresh_token),
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_TIME_LIMIT),
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(minutes=REFRESH_TOKEN_TIME_LIMIT),
     )
     session.add(token_record)
     session.commit()
@@ -87,7 +92,8 @@ async def rotate_refresh_token(
     new_token_record = RefreshToken(
         user_id=db_token.user_id,
         token_hash=hash_token(new_refresh_raw),
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_TIME_LIMIT),
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(minutes=REFRESH_TOKEN_TIME_LIMIT),
     )
     session.add(new_token_record)
     session.commit()
