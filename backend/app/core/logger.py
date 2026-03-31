@@ -1,11 +1,3 @@
-"""
-Structured logging for the UNaFIED backend.
-
-Usage:
-    from app.core.logger import logger
-    logger.info("Something happened", extra={"user_id": "abc"})
-"""
-
 import logging
 import os
 import sys
