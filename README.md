@@ -1,5 +1,19 @@
-# Unafied 🚀
+<div align="center">
 
+# 🚀 UNaFIED
+
+**Real-time chat with an AI that actually listens.**
+
+A high-performance chat platform where an agentic AI silently observes conversations and proactively recommends — movies, books, music — exactly when the moment is right.
+
+![FastAPI](https://img.shields.io/badge/FastAPI-async%20%2B%20WebSockets-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/Postgres-pgvector-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Pub%2FSub%20%2B%20Celery-DC382D?logo=redis&logoColor=white)
+![PydanticAI](https://img.shields.io/badge/Agent-PydanticAI-E92063)
+
+</div>
+
+---
 **A High-Performance Real-Time Chat Application with Proactive Agentic AI**
 
 Unafied is a backend-heavy chat platform that goes beyond standard messaging. It integrates an autonomous **Agentic AI** that acts as a silent observer ("Listener") and a proactive helper ("Recommender"). By utilizing **RAG (Retrieval Augmented Generation)** and **Vector Search**, the system analyzes semantic context in real-time to push relevant content recommendations (movies, books, music) without explicit prompts.
