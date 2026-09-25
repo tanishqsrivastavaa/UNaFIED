@@ -11,8 +11,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
     if (loading) {
         return (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-                <p style={{ fontFamily: "var(--font-serif)", fontSize: "1.25rem", color: "#999" }}>Loading…</p>
+            <div className="flex min-h-dvh w-full items-center justify-center bg-void p-4" role="status" aria-live="polite">
+                <div className="glass-2 flex items-center gap-3 rounded-lg px-4 py-3">
+                    <span className="size-2 rounded-pill bg-ink-soft" aria-hidden="true" />
+                    <p className="text-sm font-medium text-ink-soft">Restoring your session…</p>
+                </div>
             </div>
         );
     }

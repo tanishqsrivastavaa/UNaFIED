@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { LoaderCircle } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 
 export default function SignupPage() {
@@ -18,146 +19,135 @@ export default function SignupPage() {
             await signup(email, password);
             navigate("/chat");
         } catch {
-            // error is set in store
+            return;
         }
     };
 
     const passwordMismatch = confirm.length > 0 && password !== confirm;
+    const confirmDescribedBy = [
+        passwordMismatch ? "signup-password-mismatch" : "",
+        error ? "signup-error" : "",
+    ]
+        .filter(Boolean)
+        .join(" ") || undefined;
 
     return (
-        <div className="auth-page">
-            <div className="auth-card">
-                <h1>Get started.</h1>
-                <p className="auth-subtitle">Create your UNaFIED account</p>
+        <main className="flex min-h-screen items-center justify-center overflow-y-auto px-4 py-8 sm:px-6 sm:py-12">
+            <section
+                className="glass-2 w-full max-w-[400px] -translate-y-2 rounded-lg border border-edge-hairline p-6 sm:p-8"
+                aria-labelledby="signup-title"
+            >
+                <header className="mb-7">
+                    <p className="font-mono text-micro font-medium uppercase tracking-[0.24em] text-ink-soft">UNaFIED</p>
+                    <h1 id="signup-title" className="mt-4 text-xl font-semibold leading-6 text-ink-bright">
+                        Create an account.
+                    </h1>
+                    <p className="mt-2 text-sm leading-5 text-ink-soft">
+                        A quieter place for the conversations that matter.
+                    </p>
+                </header>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="auth-field">
-                        <label htmlFor="email">Email</label>
+                <form className="flex flex-col gap-5" onSubmit={handleSubmit} aria-busy={loading}>
+                    <div>
+                        <label htmlFor="signup-email" className="mb-2 block text-meta font-medium leading-4 text-ink-soft">
+                            Email
+                        </label>
                         <input
-                            id="email"
+                            id="signup-email"
                             type="email"
-                            className="input-field"
+                            className="field"
                             placeholder="you@example.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            aria-invalid={Boolean(error)}
+                            aria-describedby={error ? "signup-error" : undefined}
                             required
                             autoFocus
                         />
                     </div>
 
-                    <div className="auth-field">
-                        <label htmlFor="password">Password</label>
+                    <div>
+                        <label htmlFor="signup-password" className="mb-2 block text-meta font-medium leading-4 text-ink-soft">
+                            Password
+                        </label>
                         <input
-                            id="password"
+                            id="signup-password"
                             type="password"
-                            className="input-field"
+                            className="field"
                             placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            aria-invalid={Boolean(error)}
+                            aria-describedby={error ? "signup-error" : undefined}
                             required
                             minLength={6}
                         />
                     </div>
 
-                    <div className="auth-field">
-                        <label htmlFor="confirm">Confirm Password</label>
+                    <div>
+                        <label htmlFor="signup-confirm" className="mb-2 block text-meta font-medium leading-4 text-ink-soft">
+                            Confirm password
+                        </label>
                         <input
-                            id="confirm"
+                            id="signup-confirm"
                             type="password"
-                            className="input-field"
+                            className="field"
                             placeholder="••••••••"
                             value={confirm}
                             onChange={(e) => setConfirm(e.target.value)}
+                            aria-invalid={passwordMismatch || Boolean(error)}
+                            aria-describedby={confirmDescribedBy}
                             required
-                            style={passwordMismatch ? { borderColor: "#d44" } : undefined}
                         />
                         {passwordMismatch && (
-                            <p style={{ color: "#d44", fontSize: "0.8rem", marginTop: "0.3rem" }}>
+                            <p
+                                id="signup-password-mismatch"
+                                role="alert"
+                                aria-live="polite"
+                                className="mt-2 border-l-4 border-ink-soft pl-3 text-meta leading-5 text-ink-soft"
+                            >
                                 Passwords don't match
                             </p>
                         )}
                     </div>
 
-                    {error && <p className="auth-error">{error}</p>}
+                    {error && (
+                        <p
+                            id="signup-error"
+                            role="alert"
+                            aria-live="polite"
+                            className="border-l-2 border-ink-quiet pl-3 text-meta leading-5 text-ink"
+                        >
+                            {error}
+                        </p>
+                    )}
 
                     <button
                         type="submit"
-                        className="btn-accent auth-submit"
+                        className="btn btn-primary h-10 w-full"
                         disabled={loading || passwordMismatch}
                     >
-                        {loading ? "Creating account…" : "Create Account"}
+                        {loading ? (
+                            <>
+                                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                Creating account…
+                            </>
+                        ) : (
+                            "Create Account"
+                        )}
                     </button>
                 </form>
 
-                <p className="auth-footer">
-                    Already have an account? <Link to="/login">Sign in</Link>
+                <p className="mt-7 border-t border-edge-hairline pt-6 text-center text-meta leading-4 text-ink-soft">
+                    Already have an account?{" "}
+                    <Link
+                        to="/login"
+                        className="font-medium text-ink underline decoration-edge-strong underline-offset-4 hover:text-ink-bright"
+                    >
+                        Sign in
+                    </Link>
                 </p>
-            </div>
-
-            <style>{`
-        .auth-page {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #fff;
-          padding: 1rem;
-        }
-        .auth-card {
-          width: 100%;
-          max-width: 400px;
-        }
-        .auth-card h1 {
-          font-size: 2rem;
-          margin-bottom: 0.25rem;
-        }
-        .auth-subtitle {
-          color: var(--color-text-secondary);
-          margin-bottom: 2rem;
-          font-size: 0.9rem;
-        }
-        .auth-field {
-          margin-bottom: 1rem;
-        }
-        .auth-field label {
-          display: block;
-          font-size: 0.8rem;
-          font-weight: 600;
-          margin-bottom: 0.35rem;
-          color: var(--color-text-secondary);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .auth-error {
-          color: #d44;
-          font-size: 0.85rem;
-          margin-bottom: 1rem;
-        }
-        .auth-submit {
-          width: 100%;
-          padding: 0.85rem;
-          font-size: 1rem;
-          margin-top: 0.5rem;
-        }
-        .auth-submit:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        .auth-footer {
-          text-align: center;
-          margin-top: 1.5rem;
-          font-size: 0.85rem;
-          color: var(--color-text-secondary);
-        }
-        .auth-footer a {
-          color: var(--color-accent-hover);
-          text-decoration: none;
-          font-weight: 600;
-        }
-        .auth-footer a:hover {
-          text-decoration: underline;
-        }
-      `}</style>
-        </div>
+            </section>
+        </main>
     );
 }

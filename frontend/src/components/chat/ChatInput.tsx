@@ -1,4 +1,4 @@
-import { useState, useRef, type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { Send } from "lucide-react";
 
 interface Props {
@@ -8,18 +8,14 @@ interface Props {
 
 export default function ChatInput({ onSend, disabled }: Props) {
   const [value, setValue] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasText = value.trim().length > 0;
+  const armed = hasText && !disabled;
 
   const handleSend = () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setValue("");
-
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -29,90 +25,56 @@ export default function ChatInput({ onSend, disabled }: Props) {
     }
   };
 
-  const handleInput = () => {
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = "auto";
-      el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-    }
-  };
-
   return (
-    <div className="chat-input-bar">
-      <textarea
-        ref={textareaRef}
-        className="chat-textarea"
-        placeholder="Message UNaFIED…"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onInput={handleInput}
-        rows={1}
-        maxLength={4000}
-        disabled={disabled}
-      />
-      <button
-        className="chat-send"
-        onClick={handleSend}
-        disabled={!value.trim() || disabled}
-        title="Send"
-      >
-        <Send size={18} />
-      </button>
+    <div className="relative w-full shrink-0">
+      <div className="w-full px-5 pt-3 pb-5">
+        <div className="mx-auto w-full max-w-[720px]">
+          <div
+            className={`glass-2 flex items-end gap-2 rounded-lg p-2 transition-opacity duration-150 ease-glass focus-within:border-presence-edge focus-within:shadow-[0_0_28px_var(--color-presence-glow)] ${
+              disabled ? "pointer-events-none opacity-60" : "opacity-100"
+            }`}
+            aria-busy={disabled}
+            aria-disabled={disabled}
+          >
+            <label htmlFor="message" className="sr-only">
+              Message UNaFIED
+            </label>
+            <textarea
+              id="message"
+              className="min-h-10 max-h-[120px] w-full min-w-0 flex-1 resize-none overflow-y-auto rounded-sm bg-transparent px-3 py-2 text-base leading-6 text-ink-bright [field-sizing:content] placeholder:text-ink-quiet focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+              placeholder="Message UNaFIED…"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              maxLength={4000}
+              disabled={disabled}
+              aria-describedby="message-hint"
+            />
+            <button
+              className={`btn btn-ghost w-10 shrink-0 p-0 ${
+                armed ? "border-edge-soft bg-frost-3 text-ink-bright" : ""
+              }`}
+              type="button"
+              onClick={handleSend}
+              disabled={!hasText || disabled}
+              title="Send"
+              aria-label="Send"
+            >
+              <Send size={16} aria-hidden="true" />
+            </button>
+          </div>
 
-      <style>{`
-        .chat-input-bar {
-          display: flex;
-          align-items: flex-end;
-          gap: 0.5rem;
-          padding: 0.75rem 1.25rem;
-          border-top: 1px solid #111;
-          background: #fff;
-        }
-        .chat-textarea {
-          flex: 1;
-          resize: none;
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-card);
-          padding: 0.7rem 1rem;
-          font-size: 0.875rem;
-          font-family: var(--font-sans);
-          line-height: 1.4;
-          outline: none;
-          transition: border-color 0.2s;
-          max-height: 120px;
-        }
-        .chat-textarea:focus {
-          border-color: var(--color-accent);
-        }
-        .chat-textarea:disabled {
-          opacity: 0.5;
-        }
-        .chat-send {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          border: none;
-          background: var(--color-accent);
-          color: #111;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          transition: background 0.15s, transform 0.1s;
-        }
-        .chat-send:hover:not(:disabled) {
-          background: var(--color-accent-hover);
-        }
-        .chat-send:active:not(:disabled) {
-          transform: scale(0.93);
-        }
-        .chat-send:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-        }
-      `}</style>
+          <p
+            id="message-hint"
+            className={`mt-2 min-h-4 pl-5 text-micro leading-4 text-ink-quiet select-none transition-opacity duration-150 ease-glass ${
+              hasText ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            Enter to send · Shift+Enter for newline
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
