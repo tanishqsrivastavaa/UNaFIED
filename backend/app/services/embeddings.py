@@ -1,9 +1,10 @@
 import os
-from openai import AsyncOpenAI
+from google import genai
+from google.genai import types
 from ..core.logger import logger
+from ..config.settings import settings
 
-
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
 async def generate_embedding(text: str) -> list[float]:
@@ -11,12 +12,13 @@ async def generate_embedding(text: str) -> list[float]:
         return []
 
     try:
-        response = await client.embeddings.create(
-            input=text,
-            model='text-embedding-3-small'
+        response = await client.aio.models.embed_content(
+            model="gemini-embedding-001",
+            contents=text,
+            config=types.EmbedContentConfig(output_dimensionality=1536),
         )
 
-        return response.data[0].embedding
+        return response.embeddings[0].values
 
     except Exception as e:
         logger.error(f"Failed to generate embedding: {e}")

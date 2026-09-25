@@ -1,135 +1,82 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { LoaderCircle } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
+import { plainError } from "../lib/errors";
+import { EmailField, FormError, PasswordField } from "../components/auth/fields";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const login = useAuthStore((s) => s.login);
-    const error = useAuthStore((s) => s.error);
-    const loading = useAuthStore((s) => s.loading);
     const navigate = useNavigate();
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
+        setPending(true);
+        setError(null);
         try {
-            await login(email, password);
-            navigate("/chat");
-        } catch {
-            // error is set in store
+            await login(email.trim(), password);
+            navigate("/chat", { replace: true });
+        } catch (err) {
+            setError(plainError(err, "That didn't work. Check your email and password, then try again."));
+            setPending(false);
         }
     };
 
     return (
-        <div className="auth-page">
-            <div className="auth-card">
-                <h1>Welcome back.</h1>
-                <p className="auth-subtitle">Sign in to continue to UNaFIED</p>
+        <>
+            <h2 className="text-xl font-semibold tracking-[-0.015em] text-ink">Sign in</h2>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="auth-field">
-                        <label htmlFor="email">Email</label>
-                        <input
-                            id="email"
-                            type="email"
-                            className="input-field"
-                            placeholder="you@example.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            autoFocus
-                        />
-                    </div>
+            <form className="mt-7 flex flex-col gap-5" onSubmit={handleSubmit} aria-busy={pending}>
+                <EmailField
+                    id="login-email"
+                    label="Email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? "login-error" : undefined}
+                    required
+                    autoFocus
+                />
+                <PasswordField
+                    id="login-password"
+                    label="Password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? "login-error" : undefined}
+                    required
+                />
 
-                    <div className="auth-field">
-                        <label htmlFor="password">Password</label>
-                        <input
-                            id="password"
-                            type="password"
-                            className="input-field"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </div>
+                {error && <FormError id="login-error" message={error} />}
 
-                    {error && <p className="auth-error">{error}</p>}
+                <button type="submit" className="btn btn-primary mt-1 w-full" disabled={pending}>
+                    {pending ? (
+                        <>
+                            <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+                            Signing in…
+                        </>
+                    ) : (
+                        "Sign in"
+                    )}
+                </button>
+            </form>
 
-                    <button type="submit" className="btn-accent auth-submit" disabled={loading}>
-                        {loading ? "Signing in…" : "Sign In"}
-                    </button>
-                </form>
-
-                <p className="auth-footer">
-                    Don't have an account? <Link to="/signup">Sign up</Link>
-                </p>
-            </div>
-
-            <style>{`
-        .auth-page {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #fff;
-          padding: 1rem;
-        }
-        .auth-card {
-          width: 100%;
-          max-width: 400px;
-        }
-        .auth-card h1 {
-          font-size: 2rem;
-          margin-bottom: 0.25rem;
-        }
-        .auth-subtitle {
-          color: var(--color-text-secondary);
-          margin-bottom: 2rem;
-          font-size: 0.9rem;
-        }
-        .auth-field {
-          margin-bottom: 1rem;
-        }
-        .auth-field label {
-          display: block;
-          font-size: 0.8rem;
-          font-weight: 600;
-          margin-bottom: 0.35rem;
-          color: var(--color-text-secondary);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .auth-error {
-          color: #d44;
-          font-size: 0.85rem;
-          margin-bottom: 1rem;
-        }
-        .auth-submit {
-          width: 100%;
-          padding: 0.85rem;
-          font-size: 1rem;
-          margin-top: 0.5rem;
-        }
-        .auth-submit:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        .auth-footer {
-          text-align: center;
-          margin-top: 1.5rem;
-          font-size: 0.85rem;
-          color: var(--color-text-secondary);
-        }
-        .auth-footer a {
-          color: var(--color-accent-hover);
-          text-decoration: none;
-          font-weight: 600;
-        }
-        .auth-footer a:hover {
-          text-decoration: underline;
-        }
-      `}</style>
-        </div>
+            <p className="mt-8 text-sm text-ink-3">
+                New here?{" "}
+                <Link
+                    to="/signup"
+                    className="rounded-xs font-medium text-ink underline decoration-line-3 underline-offset-4 transition-colors duration-200 hover:decoration-ink"
+                >
+                    Create an account
+                </Link>
+            </p>
+        </>
     );
 }

@@ -51,7 +51,7 @@ async function apiFetch<T>(
     path: string,
     options: RequestInit = {}
 ): Promise<T> {
-    let token = getAccessToken();
+    const token = getAccessToken();
 
     const makeRequest = (t: string | null) =>
         fetch(`${API_BASE}${path}`, {
