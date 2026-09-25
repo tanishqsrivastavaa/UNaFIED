@@ -1,315 +1,416 @@
 @import "tailwindcss";
 
+/*
+ * UNaFIED — "Warm dusk"
+ *
+ * One rule holds the system together: blush belongs to the agent.
+ * Its cursor, its name, its proposals, its confirmations. Nothing a
+ * human does is blush — human actions are parchment.
+ *
+ * Every shared class lives inside @layer. Unlayered CSS beats every
+ * layer regardless of specificity and silently kills utilities.
+ */
+
 @theme {
-  --color-void: #06070B;
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sofia Sans Extra Condensed Variable", "Arial Narrow", sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
-  --color-pane-1: #0A0C12;
-  --color-pane-2: #0F121A;
-  --color-pane-3: #151926;
-  --color-pane-4: #1C2130;
+  /* palette */
+  --color-dusk: #0c0a09;
+  --color-plum: #2b1522;
+  --color-umber: #2a1a0f;
+  --color-blush: #f2c3bc;
+  --color-parchment: #f5f1ec;
 
-  --color-frost-1: rgba(255, 255, 255, 0.048);
-  --color-frost-2: rgba(255, 255, 255, 0.072);
-  --color-frost-3: rgba(255, 255, 255, 0.105);
+  /*
+   * ink — parchment at four strengths; mark is for non-text only.
+   * Alphas are set so every tier passes WCAG AA (4.5:1) on the brightest
+   * surface it can land on: glass over the plum glow. Don't lower them.
+   */
+  --color-ink: #f5f1ec;
+  --color-ink-2: rgb(245 241 236 / 0.8);
+  --color-ink-3: rgb(245 241 236 / 0.68);
+  --color-ink-4: rgb(245 241 236 / 0.61);
+  --color-mark: rgb(245 241 236 / 0.22);
 
-  --color-edge-hairline: rgba(255, 255, 255, 0.075);
-  --color-edge-soft: rgba(255, 255, 255, 0.115);
-  --color-edge-strong: rgba(255, 255, 255, 0.19);
+  /* translucent fills and edges, warm-tinted */
+  --color-veil-1: rgb(255 238 230 / 0.035);
+  --color-veil-2: rgb(255 238 230 / 0.06);
+  --color-veil-3: rgb(255 238 230 / 0.1);
+  --color-line-1: rgb(255 236 226 / 0.075);
+  --color-line-2: rgb(255 236 226 / 0.12);
+  --color-line-3: rgb(255 236 226 / 0.2);
 
-  --color-ink-bright: #F0F3F9;
-  --color-ink: rgba(240, 243, 249, 0.74);
-  --color-ink-soft: rgba(240, 243, 249, 0.58);
-  --color-ink-quiet: rgba(240, 243, 249, 0.50);
-  --color-mark: rgba(240, 243, 249, 0.28);
+  /* the agent's presence */
+  --color-blush-wash: rgb(242 195 188 / 0.065);
+  --color-blush-line: rgb(242 195 188 / 0.26);
+  --color-blush-glow: rgb(242 195 188 / 0.45);
 
-  --color-presence: #E0A868;
-  --color-presence-bright: #F2C692;
-  --color-presence-dim: rgba(224, 168, 104, 0.13);
-  --color-presence-edge: rgba(224, 168, 104, 0.34);
-  --color-presence-glow: rgba(224, 168, 104, 0.22);
-
-  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-
-  --text-micro: 0.6875rem;
-  --text-meta: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.875rem;
-  --text-md: 0.9375rem;
-  --text-lg: 1.0625rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
+  --text-micro: 11px;
+  --text-micro--line-height: 16px;
+  --text-meta: 12px;
+  --text-meta--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-body: 15px;
+  --text-body--line-height: 24px;
+  --text-lg: 17px;
+  --text-lg--line-height: 24px;
+  --text-xl: 22px;
+  --text-xl--line-height: 28px;
 
   --radius-xs: 6px;
   --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
-  --radius-pill: 999px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 26px;
 
-  --blur-sm: 8px;
-  --blur-md: 16px;
-  --blur-lg: 28px;
-  --blur-xl: 44px;
-  --blur-2xl: 64px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
-  --ease-glass: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-drift: cubic-bezier(0.77, 0, 0.175, 1);
+  --animate-breathe: breathe 2.8s var(--ease-in-out) infinite;
+  --animate-breathe-fast: breathe 1.1s var(--ease-in-out) infinite;
+  --animate-glow: glow 3.2s var(--ease-in-out) infinite;
+
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 0.45;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 }
 
 @layer base {
-  *,
-  *::before,
-  *::after {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  html {
+    color-scheme: dark;
+    background: var(--color-dusk);
   }
 
-  html,
-  body,
-  #root {
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
+  /* No background here: it would paint over the fixed, negative-z backdrop. */
+  body {
+    min-height: 100dvh;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgb(242 195 188 / 0.3);
+    color: var(--color-parchment);
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-presence-edge);
+    outline: 2px solid rgb(245 241 236 / 0.7);
     outline-offset: 2px;
-    border-radius: var(--radius-xs);
   }
-}
 
-@layer base {
-body {
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  color: var(--color-ink);
-  background-color: var(--color-void);
-  background-image:
-    radial-gradient(1200px 800px at 8% -12%, rgba(104, 136, 214, 0.30), transparent 58%),
-    radial-gradient(900px 700px at 96% 6%, rgba(146, 122, 208, 0.20), transparent 56%),
-    radial-gradient(1000px 760px at 72% 104%, rgba(224, 168, 104, 0.20), transparent 58%),
-    radial-gradient(820px 620px at 34% 58%, rgba(78, 106, 186, 0.18), transparent 62%);
-  background-attachment: fixed;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
-
-h1,
-h2,
-h3,
-h4 {
-  font-weight: 600;
-  color: var(--color-ink-bright);
-  letter-spacing: -0.021em;
-  text-wrap: balance;
-}
-
-p {
-  text-wrap: pretty;
-}
-}
-
-::selection {
-  background: var(--color-presence-glow);
-  color: var(--color-ink-bright);
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-2) transparent;
+  }
 }
 
 @layer components {
-  .glass-1,
-  .glass-2,
-  .glass-3 {
-    backdrop-filter: blur(var(--blur-2xl)) saturate(165%);
-    -webkit-backdrop-filter: blur(var(--blur-2xl)) saturate(165%);
+  /* ── Surfaces ─────────────────────────────────────────────── */
+
+  /* Real glass: only for large, few surfaces (rail, composer, auth card). */
+  .glass {
+    background: linear-gradient(180deg, rgb(255 238 230 / 0.07), rgb(255 238 230 / 0.028));
+    border: 1px solid var(--color-line-1);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    backdrop-filter: blur(32px) saturate(160%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.10),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.03),
-      0 18px 44px -22px rgba(0, 0, 0, 0.85);
+      inset 0 1px 0 rgb(255 250 245 / 0.075),
+      inset 0 -1px 0 rgb(255 250 245 / 0.02),
+      0 30px 80px -40px rgb(0 0 0 / 0.9);
   }
 
-  .glass-1 {
-    background: var(--color-frost-1);
-    border: 1px solid var(--color-edge-hairline);
+  /* Glass without the blur: for small surfaces that repeat (bubbles, rows). */
+  .veil {
+    background: linear-gradient(180deg, rgb(255 238 230 / 0.075), rgb(255 238 230 / 0.045));
+    border: 1px solid var(--color-line-1);
+    box-shadow: inset 0 1px 0 rgb(255 250 245 / 0.06);
   }
 
-  .glass-2 {
-    background: var(--color-frost-2);
-    border: 1px solid var(--color-edge-soft);
+  /* ── Type ─────────────────────────────────────────────────── */
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-micro);
+    line-height: var(--text-micro--line-height);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
-  .glass-3 {
-    background: var(--color-frost-3);
-    border: 1px solid var(--color-edge-soft);
-  }
-
-  .hairline {
-    border: 0;
-    height: 1px;
-    background: var(--color-edge-hairline);
+  .display {
+    font-family: var(--font-display);
+    font-weight: 800;
+    text-transform: uppercase;
+    line-height: 0.84;
+    letter-spacing: -0.012em;
+    font-kerning: normal;
   }
 
   .tnum {
-    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    font-size: var(--text-micro);
-    letter-spacing: 0.01em;
-    color: var(--color-ink-quiet);
   }
+
+  /* ── Controls ─────────────────────────────────────────────── */
 
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    height: 40px;
-    padding: 0 1rem;
-    border-radius: var(--radius-sm);
+    gap: 8px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: var(--radius-md);
     border: 1px solid transparent;
-    font-family: var(--font-sans);
     font-size: var(--text-base);
-    font-weight: 500;
-    letter-spacing: -0.005em;
-    cursor: pointer;
+    font-weight: 600;
     white-space: nowrap;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
     transition:
-      background-color 140ms var(--ease-glass),
-      border-color 140ms var(--ease-glass),
-      color 140ms var(--ease-glass),
-      box-shadow 140ms var(--ease-glass),
-      transform 120ms var(--ease-glass);
+      transform 160ms var(--ease-out),
+      background-color 200ms var(--ease-out),
+      border-color 200ms var(--ease-out),
+      color 200ms var(--ease-out),
+      opacity 200ms var(--ease-out);
   }
-
-  .btn:active {
+  .btn:active:not(:disabled) {
     transform: scale(0.97);
   }
-
   .btn:disabled {
-    opacity: 0.38;
     cursor: not-allowed;
-    transform: none;
+    opacity: 0.45;
   }
 
   .btn-primary {
-    background: var(--color-presence);
-    color: #150F07;
-    font-weight: 600;
-    box-shadow: 0 8px 22px -10px var(--color-presence-glow);
+    background: var(--color-parchment);
+    color: var(--color-dusk);
   }
-
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-presence-bright);
+    background: #fffdfa;
   }
 
   .btn-ghost {
-    background: var(--color-frost-2);
-    border-color: var(--color-edge-hairline);
-    color: var(--color-ink);
+    background: var(--color-veil-1);
+    border-color: var(--color-line-2);
+    color: var(--color-ink-2);
   }
-
   .btn-ghost:hover:not(:disabled) {
-    background: var(--color-frost-3);
-    border-color: var(--color-edge-soft);
-    color: var(--color-ink-bright);
+    background: var(--color-veil-3);
+    border-color: var(--color-line-3);
+    color: var(--color-ink);
   }
 
   .btn-quiet {
     background: transparent;
-    color: var(--color-ink-soft);
+    color: var(--color-ink-3);
+  }
+  .btn-quiet:hover:not(:disabled) {
+    background: var(--color-veil-2);
+    color: var(--color-ink);
   }
 
-  .btn-quiet:hover:not(:disabled) {
-    background: var(--color-frost-1);
-    color: var(--color-ink-bright);
+  .btn-icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
   }
 
   .field {
     width: 100%;
-    min-height: 40px;
-    padding: 0.5rem 0.875rem;
-    background: rgba(0, 0, 0, 0.30);
-    border: 1px solid var(--color-edge-hairline);
-    border-radius: var(--radius-sm);
-    color: var(--color-ink-bright);
-    font-family: var(--font-sans);
-    font-size: var(--text-base);
-    line-height: 1.5;
-    outline: none;
+    height: 46px;
+    padding: 0 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-line-2);
+    background: rgb(0 0 0 / 0.22);
+    color: var(--color-ink);
+    font-size: var(--text-body);
     transition:
-      border-color 140ms var(--ease-glass),
-      background-color 140ms var(--ease-glass),
-      box-shadow 140ms var(--ease-glass);
+      border-color 200ms var(--ease-out),
+      background-color 200ms var(--ease-out),
+      box-shadow 200ms var(--ease-out);
   }
-
   .field::placeholder {
-    color: var(--color-ink-quiet);
+    color: var(--color-ink-4);
   }
-
   .field:hover {
-    border-color: var(--color-edge-soft);
+    border-color: var(--color-line-3);
   }
-
-  .field:focus,
-  .field:focus-visible {
+  .field:focus {
     outline: none;
-    border-color: var(--color-presence-edge);
-    background: rgba(0, 0, 0, 0.38);
-    box-shadow: 0 0 0 3px var(--color-presence-dim);
+    border-color: rgb(245 241 236 / 0.42);
+    background: rgb(0 0 0 / 0.3);
+    box-shadow: 0 0 0 4px rgb(245 241 236 / 0.06);
   }
-
   .field[aria-invalid="true"] {
-    border-color: var(--color-edge-strong);
-    background: rgba(0, 0, 0, 0.36);
-    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.30);
+    border-color: rgb(245 241 236 / 0.5);
+    background: rgb(245 241 236 / 0.04);
   }
 
-  .presence-mark {
-    position: relative;
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    height: 20px;
+    min-width: 20px;
+    padding: 0 5px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--color-line-2);
+    background: var(--color-veil-1);
+    font-family: var(--font-mono);
+    font-size: var(--text-micro);
+    line-height: 1;
+    color: var(--color-ink-3);
   }
 
-  .presence-mark::before {
-    content: "";
-    position: absolute;
-    left: -15px;
-    top: 0.5em;
-    width: 2px;
-    height: 1.15em;
-    border-radius: var(--radius-pill);
-    background: var(--color-presence);
-    box-shadow: 0 0 12px 1px var(--color-presence-glow);
+  /* ── The agent's ink ──────────────────────────────────────── */
+
+  /*
+   * Words arrive in blush and cool to their resting colour, like ink
+   * drying. The 100% keyframe is left out on purpose: the browser
+   * animates towards the element's own computed colour.
+   */
+  .ink-in {
+    animation: ink-in 1500ms linear both;
+  }
+  .ink-in-slow {
+    animation: ink-in 2000ms linear both;
+  }
+
+  /* ── Ticket (agent proposal) ──────────────────────────────── */
+
+  /* Two halves, each punched with half-circle notches at the tear line. */
+  .ticket-top,
+  .ticket-stub {
+    --notch: 9px;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 51% 100%;
+    mask-size: 51% 100%;
+  }
+  .ticket-top {
+    -webkit-mask-image:
+      radial-gradient(circle var(--notch) at 0 100%, #0000 97%, #000),
+      radial-gradient(circle var(--notch) at 100% 100%, #0000 97%, #000);
+    mask-image:
+      radial-gradient(circle var(--notch) at 0 100%, #0000 97%, #000),
+      radial-gradient(circle var(--notch) at 100% 100%, #0000 97%, #000);
+    -webkit-mask-position: left, right;
+    mask-position: left, right;
+  }
+  .ticket-stub {
+    -webkit-mask-image:
+      radial-gradient(circle var(--notch) at 0 0, #0000 97%, #000),
+      radial-gradient(circle var(--notch) at 100% 0, #0000 97%, #000);
+    mask-image:
+      radial-gradient(circle var(--notch) at 0 0, #0000 97%, #000),
+      radial-gradient(circle var(--notch) at 100% 0, #0000 97%, #000);
+    -webkit-mask-position: left, right;
+    mask-position: left, right;
+  }
+
+  /* ── Thread scroller: content dissolves at the edges ──────── */
+
+  /* Fully clear under the 64px header, then a soft fade into view. */
+  .thread-fade {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 60px,
+      #000 124px,
+      #000 calc(100% - 20px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 60px,
+      #000 124px,
+      #000 calc(100% - 20px),
+      transparent 100%
+    );
   }
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+/* Surface quickly, hold the warm colour for a beat, then cool slowly. */
+@keyframes ink-in {
+  0% {
+    opacity: 0;
+    color: var(--color-blush);
+    animation-timing-function: var(--ease-out);
+  }
+  22% {
+    opacity: 1;
+    color: var(--color-blush);
+    animation-timing-function: linear;
+  }
+  40% {
+    color: var(--color-blush);
+    animation-timing-function: var(--ease-in-out);
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+@keyframes drift-a {
+  to {
+    transform: translate3d(9vw, 7vh, 0) scale(1.14);
+  }
 }
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.10);
-  border-radius: var(--radius-pill);
-  border: 3px solid transparent;
-  background-clip: content-box;
+@keyframes drift-b {
+  to {
+    transform: translate3d(-8vw, -6vh, 0) scale(0.92);
+  }
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.20);
-  background-clip: content-box;
+@keyframes drift-c {
+  to {
+    transform: translate3d(-5vw, -3vh, 0) scale(1.2);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .ink-in,
+  .ink-in-slow {
+    animation: none;
+  }
+  .animate-breathe,
+  .animate-breathe-fast,
+  .animate-glow {
+    animation: none;
+    opacity: 0.8;
+  }
+  [data-drift] {
+    animation: none !important;
   }
 }
