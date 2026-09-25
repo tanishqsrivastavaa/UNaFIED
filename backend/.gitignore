@@ -11,3 +11,4 @@ wheels/
 .env
 alembic.ini
 alembic/
+PLAN*
