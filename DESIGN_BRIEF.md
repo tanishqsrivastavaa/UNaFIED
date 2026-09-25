@@ -1,326 +1,229 @@
-# UNaFIED — Frontend Design Brief
+# UNaFIED — Frontend Design Brief ("Warm dusk")
 
-A self-contained brief for building or extending the UNaFIED interface. Everything here is
-already implemented and verified in this repo; treat it as the specification, not a proposal.
+The specification for the UNaFIED interface. Everything here is implemented in `frontend/src`.
+Read the code before trusting this document; where they disagree, the code wins and this file
+is out of date.
 
----
-
-## 1. The brief, in the owner's words
-
-> "Super minimal, very straightforward. Minimal, clean, smooth. Glass morphism. The user should
-> have the best experience on the app."
-
-Every decision below is in service of those five words. When a choice is open, pick the one
-that is quieter. Minimal here means *restrained*, not sparse — the interface should feel
-inevitable, not empty.
+The previous interface (cool blue glass, amber accent) is preserved in commit `7968749`.
 
 ---
 
-## 2. What the product is
+## 1. The brief
 
-A real-time chat where an **ambient agent listens passively** and converts commitments made in
-passing into actions. Someone types *"let's meet at 5pm"* and, without anyone addressing the
-agent, it becomes a 4:45pm reminder.
+> Glassmorphism, minimalism, a dark gradient background. Super smooth, very smooth animations.
+> Soothing and easy to use.
 
-This premise dictates the entire visual language. The agent is not a chatbot the user summons.
-It is a **presence in the room**. So:
+It is drawn from two references:
 
-- The agent never competes with the humans for attention.
-- The agent's voice is visually distinct — a different *kind* of thing, not just a different colour.
-- Nothing may interrupt, notify, or demand attention. Everything is ambient.
+- **Buena Dev** (buena.com/dev): a terminal as a website. It uses warm stone neutrals and lets
+  type do all the work, with small uppercase mono labels and key chips like `[⌃+L] CLEAR`. Each
+  character fades in with a staggered delay on an expo-out curve, and a block cursor waits at
+  the prompt. The feeling is quiet competence.
+- **Crush** (crush.enterprises): a studio with one bold condensed display face, three colors,
+  and its process drawn as a receipt with dashed tear lines. The feeling is friendly, human and
+  confident.
 
-The design must make a user feel *observed helpfully*, never *watched*. An agent that writes to
-a calendar from a group conversation is the highest-stakes surface in the product, so anything
-the agent proposes is framed as a **proposal** the user confirms — never as a completed action.
+What they share, and what this system keeps: **very few colors, warm neutrals, type carrying
+the personality, and motion that is opacity-first and never bouncy.** Neither site uses glass,
+gradients or rounded corners. Those come from our brief. The job is adding them without losing
+the restraint.
 
----
+## 2. The product premise
 
-## 3. The one semantic rule
+UNaFIED is a chat where an AI agent sits in the conversation. It answers, it remembers across
+conversations (RAG), and for anything it can't undo it **proposes** an action and waits for a
+yes. The long-term direction (`PLAN.md`) is a passive listener that turns commitments into
+reminders.
 
-This is the spine of the system. Enforce it everywhere.
+So the agent is a *presence in the room*, not a participant competing for attention. That
+premise drives every rule below.
+
+## 3. The one rule
+
+**Blush belongs to the agent.** It is used for exactly these things:
+
+1. The agent's cursor (its mark, logo and "thinking" signal)
+2. The agent's name line (`UNaFIED`)
+3. Proposals (tickets) and their confirmations ("Approved", "Done")
+4. The ink-drying moment when agent text arrives
+
+Human actions are **parchment**: the send button, "Sign in", "Approve" (approving is something
+the person does). Errors are neutral ink with an icon, never blush and never red.
 
 | | Humans | The agent |
 | :--- | :--- | :--- |
-| Surfaces | neutral glass — `pane-*` / `frost-*` | warm presence — `bg-presence-dim`, `border-presence-edge` |
-| Text | `ink-bright` (most contrast) | `ink` (one tier down) |
-| Accent | none | `presence` amber `#E0A868` |
-| Form | right-aligned bubbles | left-aligned annotation, **no bubble** |
+| Surface | `.veil` glass bubble, right-aligned | no bubble, left-aligned |
+| Type | Instrument Sans, `text-body`, full `ink` | DM Mono, `text-base`, `ink-2` |
+| Mark | none | blush block cursor + `UNaFIED` |
 
-**Presence amber is reserved for exactly four things:**
+## 4. Tokens (`src/index.css`, `@theme`)
 
-1. The agent's own voice (kicker, left rule, listening indicator)
-2. Actions the agent proposes
-3. Confirmed states
-4. Focus rings on user-initiated focus (composing, sending)
+### Palette
 
-Nothing else may use it. Not navigation, not errors, not hover states, not a human send button.
-When in doubt, use neutral ink. Violating this rule is the single most common way a build drifts
-away from the intended feel.
+| Token | Value | Role |
+| :--- | :--- | :--- |
+| `dusk` | `#0C0A09` | canvas |
+| `plum` | `#2B1522` | upper-left glow |
+| `umber` | `#2A1A0F` | lower-right glow |
+| `blush` | `#F2C3BC` | the agent (see §3) |
+| `parchment` | `#F5F1EC` | ink and human primary actions |
 
----
+### Ink (parchment at four strengths)
 
-## 4. Design tokens
+| Token | Alpha | Use |
+| :--- | :--- | :--- |
+| `ink` | 1.00 | human messages, titles |
+| `ink-2` | 0.80 | agent text, secondary |
+| `ink-3` | 0.68 | supporting copy |
+| `ink-4` | 0.61 | timestamps, labels, placeholders |
+| `mark` | 0.22 | **non-text only** |
 
-All tokens live in `src/index.css` inside `@theme`. **Never hardcode a colour.** Every value
-below is already defined — read the file rather than trusting this document.
+Every tier passes WCAG AA (≥ 4.5:1) on the brightest surface it can land on, which is glass over
+the plum glow (`ink-4` measures 4.9:1 there). **Do not lower these alphas.** At 0.50, `ink-4`
+failed at 3.8:1.
 
-### Surfaces — one hue, lightness only
+### Surfaces
 
-```css
---color-void:  #06070B;        /* the canvas */
---color-pane-1: #0A0C12;       /* rail / list */
---color-pane-2: #0F121A;
---color-pane-3: #151926;
---color-pane-4: #1C2130;
-```
-
-Never give a sidebar a different background colour from the canvas. That fragments the space
-into "sidebar world" and "content world." Separate panes with translucency and hairlines only.
-
-### Glass fills
-
-```css
---color-frost-1: rgba(255,255,255,0.048);
---color-frost-2: rgba(255,255,255,0.072);
---color-frost-3: rgba(255,255,255,0.105);
-```
-
-### Edges
-
-```css
---color-edge-hairline: rgba(255,255,255,0.075);
---color-edge-soft:     rgba(255,255,255,0.115);
---color-edge-strong:   rgba(255,255,255,0.190);
-```
-
-### Ink — four tiers, all WCAG AA verified
-
-| Token | Alpha | Contrast on void | Use |
-| :--- | :--- | :--- | :--- |
-| `ink-bright` | 1.00 | 17.68:1 | human message text, titles |
-| `ink` | 0.74 | 8.71:1 | agent body, secondary |
-| `ink-soft` | 0.58 | 6.19:1 | labels, supporting copy |
-| `ink-quiet` | 0.50 | 4.82:1 | metadata, timestamps |
-| `mark` | 0.28 | — | **non-text only** — dots, decorative rules |
-
-`mark` is not for text. The two low-alpha tiers previously failed AA at 4.23:1 and 2.07:1 while
-carrying every error message, empty state, and form label in the app. Do not lower them.
-
-### Presence
-
-```css
---color-presence:       #E0A868;   /* 9.5:1 */
---color-presence-bright: #F2C692;
---color-presence-dim:    rgba(224,168,104,0.13);
---color-presence-edge:   rgba(224,168,104,0.34);
---color-presence-glow:   rgba(224,168,104,0.22);
-```
+- `.glass`: real backdrop blur (32px, saturate 160%). Use it only for a few large surfaces:
+  the rail, the composer, the auth card.
+- `.veil`: the same look without the blur, for small repeated surfaces (bubbles, avatar).
+  Blur on dozens of bubbles above an animated background is a GPU cost with no visible payoff.
+- Warm-tinted fills `veil-1..3` and edges `line-1..3`. Never flat opaque cards.
 
 ### Type
 
-Self-hosted variable fonts via `@fontsource-variable/inter` and
-`@fontsource-variable/jetbrains-mono`, imported in `src/main.tsx`.
+| Role | Face | Where |
+| :--- | :--- | :--- |
+| Display | Sofia Sans Extra Condensed 800, uppercase | **only** the sign-in headline and empty states |
+| Body / UI | Instrument Sans (variable) | people, interface |
+| Voice / utility | DM Mono 400/500 | the agent, `.eyebrow` labels, `.kbd` chips, times |
 
-```css
-text-micro  11px   text-md   15px   text-xl    20px
-text-meta   12px   text-lg   17px   text-2xl   24px
-text-sm     13px
-text-base   14px
-```
+Fonts are self-hosted via `@fontsource*` and imported in `main.tsx`. The named scale is
+`micro 11 · meta 12 · sm 13 · base 14 · body 15 · lg 17 · xl 22`. Use the names, not `text-[13px]`.
 
-Use these named sizes. **Never `text-[13px]`.** Arbitrary sizes are how a scale quietly stops
-being a scale. Hierarchy is carried by **weight and colour** more than size — a single 14px
-tier holding three levels through weight and opacity reads cleaner than three near-identical sizes.
+### Motion
 
-### Radius, blur, easing
+- `--ease-out: cubic-bezier(0.22, 1, 0.36, 1)` for everything entering (the same curve Buena uses).
+- `--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1)` for breathing and drifting.
+- Interactive transitions take 160–300ms. Entrances take 450–900ms. Nothing springs or bounces.
 
-```css
-radius:  xs 6 · sm 8 · md 10 · lg 14 · xl 18 · pill 999
-blur:    sm 8 · md 16 · lg 28 · xl 44 · 2xl 64
-easing:  ease-glass cubic-bezier(0.23, 1, 0.32, 1)    /* entering, interactive */
-         ease-drift cubic-bezier(0.77, 0, 0.175, 1)  /* on-screen movement */
-```
+## 5. Signature moments
 
-**Concentric radius:** nested rounded elements need `outerRadius = innerRadius + padding`. Equal
-radius on parent and child is the most common reason a UI looks subtly wrong.
+**The cursor.** A blush block from a terminal prompt. It is the logo, it breathes after
+"SAY IT ONCE." on sign-in, it sits before the agent's name, and it pulses at the end of the
+agent's line while it thinks. At large sizes use `mode="glow"`: the block stays solid and a halo
+behind it breathes. Fading the pale block itself turns it grey.
 
-### The glass recipe
+**Ink drying** (`Materialize`, `.ink-in`). Agent replies arrive word by word, each surfacing
+in blush, holding for a beat, then cooling to `ink-2`. Measured timeline: a word surfaces by
+~250ms, starts cooling at ~750ms and settles by ~1.5s. A whole reply settles in about 2s,
+because the per-word delay compresses so long replies stay under a second of stagger.
+History never replays this. Only rows that arrive during the visit animate.
 
-Depth strategy is **layered glass and only that.** No flat opaque cards. No drop shadows on
-anything that isn't glass. One recipe, used everywhere:
+**The ticket** (`Ticket.tsx`). A proposal is a glass ticket with notches punched at a dashed
+tear line. Above the line is what will happen (label, parameters in mono). The stub is where
+the person decides: "Not now" or "Approve".
 
-```css
-backdrop-filter: blur(var(--blur-2xl)) saturate(165%);
-box-shadow:
-  inset 0 1px 0 rgba(255,255,255,0.10),      /* the specular top edge — this is what sells it */
-  inset 0 -1px 0 rgba(255,255,255,0.03),
-  0 18px 44px -22px rgba(0,0,0,0.85);
-```
+**The dusk** (`Backdrop.tsx`). Three soft glows drift on 52s, 64s and 78s cycles, so the room
+never visibly loops. There is also a vignette and a grain layer, which stops dark gradients from
+banding.
 
-Glass is only visible if there is luminance behind it to refract. The `body` carries four large
-radial gradients (cool blue upper-left, violet upper-right, warm amber lower-right, blue
-centre) precisely so panes have something to blur. Do not flatten the background.
-
-Shared classes `.glass-1`, `.glass-2`, `.glass-3`, `.hairline`, `.tnum`, `.btn` (+ variants),
-`.field`, and `.presence-mark` are all in `index.css`. Use them instead of re-declaring.
-
----
-
-## 5. Layout
+## 6. Layout
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  top bar — h-14 (56px)                                   │  wordmark · agent status · account · logout
-├───────────────┬──────────────────────────────────────────┤
-│               │  thread header — 56px                    │  conversation title · participants
-│  conversation │──────────────────────────────────────────│
-│  list         │  ░ scroll fades under the header ░       │
-│  w-80 (320px) │                                          │
-│               │        messages — max-w-[720px],          │  centred measure
-│               │        mx-auto, bottom gravity            │
-│               │                                          │
-│               │  ░ scroll fade above the composer ░      │
-│               │  composer — max-w-[720px] mx-auto        │
-└───────────────┴──────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│ ╭────────────╮     Weekend in Lisbon            ▮ LISTENING   │
+│ │ ▮ UNaFIED  │     5 messages                                 │  header: no surface,
+│ │ + New  ⌘K  │                     ╭──────────────────────╮   │  content fades under it
+│ │ CONVERS…   │                     │ human glass bubble   │   │
+│ │ ▓ Lisbon   │                     ╰──────────────────────╯   │
+│ │   Numbers  │     ▮ UNaFIED 8:42 PM                          │
+│ │            │     agent text in mono, no bubble              │  one 680px column
+│ │            │     ┌ ticket ─────────────┐                    │  (header, thread,
+│ │ ○ me@…  ⇥  │     ╭──────────────────────────────────╮       │   composer share it)
+│ ╰────────────╯     │ Write a message…              ↑  │       │  composer floats; text
+│                    ╰──────────────────────────────────╯       │  scrolls under the glass
+└───────────────────────────────────────────────────────────────┘
 ```
 
-- **The empty vertical rail is gone.** It was a 240px column holding a wordmark and one nav item.
-  A full-width top bar is quieter and gives the thread a real header plus ~200px more width.
-- **Everything in the thread shares one 720px measure** — header, messages, and composer. They
-  must form a single column. A 720px measure is roughly a 90-character line; longer is unreadable.
-- **Bottom gravity:** short threads rest just above the composer (`min-h-full` + `mt-auto` on the
-  message list) rather than stranding a void beneath them.
-- **Scroll fades** top and bottom, so content dissolves under the header and into the composer
-  instead of being sliced by a hard edge.
-- **Responsive:** below `sm` the conversation list is full-width and hidden when a conversation is
-  open, and the thread header gains a back button. Both are required — a fixed 320px list on a
-  390px viewport leaves 70px of thread.
+- The rail is a floating glass panel (296px, radius 28). The thread sits directly on the dusk.
+- **Bottom gravity:** short threads rest just above the composer.
+- The scroller extends under the header and composer. Its edges fade with a **CSS mask**
+  (`.thread-fade`), never an overlay gradient: an overlay needs a solid color to fade into, and
+  the background is a moving gradient.
+- Below `md`, the list is full-screen. Opening a conversation hides it, and the header gains a
+  back button.
 
----
+## 7. Behaviour
 
-## 6. Component specifications
+- **⌘K / Ctrl+K** starts a conversation from anywhere in the chat. **/** focuses the composer.
+  **Enter** sends, **Shift+Enter** adds a new line (IME composition is respected).
+- A **new conversation opens instantly**: it is known to be empty (`freshConversations`), so
+  the thread doesn't wait on a fetch.
+- **Delete asks twice.** The first click turns the icon into "Delete" and the confirmation
+  expires after 3s. A failed delete leaves the row and says so.
+- **Failed sends are honest.** After a stream error the thread asks the server what it kept.
+  If the message wasn't saved, it goes back into the composer ("…it's back in the box"). If it
+  was saved but got no reply, the thread says so.
+- **Stream text**: the agent is prompted to answer in JSON, and the stream forwards that raw
+  text. `lib/reply.ts` extracts the readable `chat_message` from a partial document so users
+  never see braces. Remove it once the backend streams plain text.
+- **Timestamps**: the API sends zone-less UTC. `lib/time.ts` parses them as UTC.
 
-**Human message** — right-aligned neutral glass bubble, `rounded-lg` with `rounded-tr-md` so one
-corner tightens toward the sender, max ~78% width, `text-base ink-bright`. Humans are what the
-user came to read, so they get the most contrast.
+## 8. Non-negotiable technical constraints
 
-**Agent message** — **not a bubble.** No fill, no bubble chrome. A `presence-mark` warm left
-rule, an `UNaFIED` kicker at `text-micro` in presence amber, body text at `text-base ink`. It
-should read as an annotation on the conversation, not a participant competing for attention.
+Each of these caused a visible bug in this repo.
 
-**Rhythm** — same-sender messages sit 4px apart; a change of sender gets 20px. Monotone spacing
-is the sound of nobody deciding. Drop repeated avatars and labels inside a group.
+1. **Shared CSS lives in `@layer`.** Unlayered CSS beats every layer regardless of specificity.
+   (The reduced-motion overrides are deliberately unlayered, so they win.)
+2. **No background on `body`.** With a background on `html`, the body's own background paints
+   *above* the fixed `-z-10` backdrop and hides the whole gradient.
+3. **Tailwind v4's important modifier is trailing**: `rounded-md!`, not `!rounded-md`.
+4. **Never `scrollIntoView` in the thread.** It scrolls every scrollable ancestor. Scroll the
+   scroller element directly.
+5. **Keys in the thread are positional** so the streaming row and its settled copy are the same
+   element. Changing to id keys makes every reply replay its entrance after the refetch.
+6. **Auto-scroll follows `messages`, not `rows.length`.** The refetch can attach a proposal
+   without adding a row. Keying on the length left new tickets hidden under the composer
+   (verified: ticket bottom at 1000px vs composer top at 790px).
+7. **Framer Motion ignores the CSS reduced-motion query.** `MotionConfig reducedMotion="user"` in
+   `App.tsx` covers it globally. CSS animations are covered in `index.css`.
+8. **Vite's dev watcher can lose a file** that an editor saves via atomic rename. If an edit
+   doesn't show up, check the served module (`curl localhost:5173/src/…`) before debugging the
+   code, then restart the dev server.
 
-**Agent proposal card** — presence-tinted glass, `bg-presence-dim`, `border-presence-edge`, warm
-left rule. Hierarchy is the whole game here:
-- kicker `AGENT PROPOSAL` — `text-micro text-presence`
-- the proposed action — `text-lg font-semibold ink-bright` ← **the focal element**
-- the tool name — `.tnum`, mono, `text-micro ink-quiet` ← an implementation detail, demote it
+## 9. Accessibility
 
-Approve is `.btn.btn-primary` (40px). Dismiss is a 40px icon-only `.btn.btn-quiet` with an
-`aria-label`. The destructive path must never be visually dominant.
+- Every control has hover, active, focus-visible and disabled states. Focus rings are 2px
+  parchment at 70%.
+- Hit targets are ≥ 40px. Icon-only buttons have `aria-label`.
+- The thread is `role="log"`. Status changes (thinking, tool running or done) are announced via
+  `role="status"`.
+- Hover-only timestamps stay in the DOM (opacity, never `display: none`). On touch devices the
+  delete control is always visible and the hover time is hidden (`pointer-coarse:`).
+- Reduced motion: text appears immediately, cursors hold still and the background stops drifting.
 
-**Composer** — a `glass-2 rounded-lg` pane inside a padded container, so it never touches the
-viewport edge. Textarea grows via `field-sizing: content` with a 120px cap. The send button is
-neutral glass, becoming `bg-frost-3` when armed — **not** presence, because a human sending is a
-human action. Enter sends, Shift+Enter newlines.
+## 10. Verify by looking
 
----
+Typechecking says nothing about whether glass looks like glass. Before calling UI work done:
 
-## 7. Non-negotiable technical constraints
+- Screenshot at **1440×900** and **390×844** with Playwright.
+- Cover these states: signed out, sign-in error, lobby, empty thread, populated thread, thinking,
+  proposal, proposal approved, list error, thread error, failed delete.
+- When something looks wrong, measure it (`getBoundingClientRect`, `getComputedStyle`) before
+  theorising. Screenshot timestamps are unreliable for animation: headless Chromium renders the
+  32px blur in software and lags up to a second. Sample computed styles in-page instead.
+- Confirm tokens reach the build by grepping `dist/assets/*.css` for the raw value. The minifier
+  rewrites `rgb(… / 0.61)` as `#f5f1ec9c`.
 
-These are not style preferences. Each one caused a visible bug.
+## 11. Known backend issues (found during this build)
 
-**1. Layer order — the reset and all shared classes MUST be inside `@layer`.**
-
-```css
-@layer base { *, *::before, *::after { margin: 0; padding: 0; } }
-@layer components { .btn { ... } .glass-1 { ... } }
-```
-
-Unlayered CSS beats *every* `@layer` in the cascade, regardless of specificity. An unlayered
-reset silently annihilates every `p-*`/`m-*` utility in the app. An unlayered `.btn` overrides
-`display: grid` and `justify-content`. This is how conversation titles ended up centred and the
-composer ended up jammed against the viewport edge.
-
-**2. Tailwind v4 important modifier is TRAILING.**
-
-```css
-rounded-md!     /* v4 — correct */
-!rounded-md     /* v3 — generates NOTHING, fails silently */
-```
-
-**3. Never `scrollIntoView` for a chat list.** It walks up and scrolls *every* scrollable
-ancestor, and `overflow: hidden` elements are programmatically scrollable. It will scroll your
-whole app shell out of view. Scroll the one element directly:
-
-```js
-scrollerRef.current.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
-```
-
-**4. Never `@import url(...)` a webfont in the Tailwind entry CSS.** The Vite plugin drops it.
-Self-host with `@fontsource-variable/*` and import in `main.tsx`.
-
-**5. Do not stack layout utilities on an element that also carries `.btn`** unless you have
-verified the result in a browser.
-
----
-
-## 8. Accessibility — required, not optional
-
-- Every interactive element: `hover`, `active`, `focus-visible`, `disabled`.
-- Every data surface: `loading`, `empty`, `error`. Missing states are the fastest tell of an
-  unfinished interface.
-- Hit targets ≥ 40px. Extend small controls with padding or a pseudo-element; never let two hit
-  areas overlap.
-- Real semantic elements — `<button>`, `<a>`, `<label>`, `<nav>`, `<main>`. Never a `div onClick`.
-- Icon-only controls need `aria-label`. Error text needs `aria-describedby`; invalid fields need
-  `aria-invalid` **and** a visual style for it.
-- Timestamps revealed on hover must stay exposed to assistive tech — use opacity, never
-  `display: none`, and keep them out of the tab order.
-- `aria-live` on async state transitions (running → result / error).
-- **Reduced motion:** the global CSS media query does **not** cover framer-motion, which animates
-  via the Web Animations API. Guard every JS animation with `useReducedMotion()`.
-- Animate only `transform` and `opacity`. Never `transition: all`. Durations 120–200ms
-  interactive. Press feedback `active:scale-[0.97]`.
-
----
-
-## 9. Verify by looking at it
-
-**This is the part that matters most, and the part most often skipped.**
-
-A redesign can pass `tsc`, pass `eslint`, pass `vite build`, and be unusable. Typechecking says
-nothing about whether glass looks like glass. Every previous round of changes in this repo was
-"verified" by the typechecker alone and shipped broken — fonts silently missing, spacing
-utilities silently dead, the thread header scrolled out of existence.
-
-So: **render it and look at it** before calling any work done.
-
-- Playwright is installed. Screenshot at **1440×900** and **390×844**.
-- Exercise real states: signed out, empty list, empty thread, populated thread, proposal card,
-  loading, error. A screenshot of one happy path is not verification.
-- When something looks wrong, **measure it in the browser** before theorising —
-  `getBoundingClientRect()` and computed styles settle in one run what three rounds of guessing
-  will not. Several "bugs" in this build turned out to be screenshot-timing artifacts, and one
-  real bug looked like a layout mystery until the ancestor chain was dumped.
-- A class name in your source is not evidence that it produces CSS. To check, build and grep
-  `dist/assets/*.css`. Use `grep -a` (the output is long-lined) and grep the raw value
-  (`400px`), not the class syntax (`max-w-\[400px\]`).
-
-Definition of done: build green, lint at or below its pre-existing baseline, `tsc --noEmit`
-silent, and **screenshots reviewed at both widths**.
-
----
-
-## 10. Known open items
-
-- The amber `Sign In` button is the loudest element on the auth screen. Defensible for a primary
-  CTA; pull it back if a quieter treatment is wanted.
-- There is no `Settings` view. The nav item was removed rather than shipped permanently disabled.
-- The frontend talks to the backend over HTTP streaming, **not** the WebSocket. There is no
-  live multi-user delivery yet — the WebSocket server exists but no client connects to it.
-- `MessageThread` has a real bug: a failed detail fetch leaves `loadState` as `"error"` and the
-  post-send refetch never restores `"ready"`.
-- Backend `/api/v1/me` and `/api/v1/signup` serialise `User` directly, so **bcrypt password
-  hashes reach the client.** Needs a `UserRead` response model.
+- **Every `DELETE /chats/{id}` returns 500**, including for conversations with no messages. The
+  models declare no cascade on participant, message or embedding foreign keys. That is the likely
+  cause, not yet confirmed against the server log.
+- **The agent emits tool calls as text**, e.g. `{"name": "calculator", "arguments": 2450 * 0.18}`.
+  The prompt promises four tools, but `chat_agent.py` registers none and uses `output_type=str`.
+  The server stores the malformed text verbatim.
+- **The stream forwards raw JSON** (see §7). The frontend compensates; the backend should stream
+  plain text.
+- `/signup` still returns `hashed_password` to the client.
