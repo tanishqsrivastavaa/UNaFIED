@@ -4,7 +4,6 @@
 
 **Real-time chat with an AI that actually listens.**
 
-A high-performance chat platform where an agentic AI silently observes conversations and proactively recommends — movies, books, music — exactly when the moment is right.
 
 ![FastAPI](https://img.shields.io/badge/FastAPI-async%20%2B%20WebSockets-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/Postgres-pgvector-4169E1?logo=postgresql&logoColor=white)
@@ -16,7 +15,7 @@ A high-performance chat platform where an agentic AI silently observes conversat
 ---
 **A High-Performance Real-Time Chat Application with Proactive Agentic AI**
 
-Unafied is a backend-heavy chat platform that goes beyond standard messaging. It integrates an autonomous **Agentic AI** that acts as a silent observer ("Listener") and a proactive helper ("Recommender"). By utilizing **RAG (Retrieval Augmented Generation)** and **Vector Search**, the system analyzes semantic context in real-time to push relevant content recommendations (movies, books, music) without explicit prompts.
+Unafied is a backend-heavy chat platform that goes beyond standard messaging. It integrates an autonomous **Agentic AI** that acts as a silent observer ("Listener") and a proactive helper ("Recommender"). By utilizing **RAG (Retrieval Augmented Generation)** and **Vector Search**, the system analyzes semantic context in real-time to push relevant events without explicit prompts.
 
 ---
 
@@ -51,7 +50,6 @@ Real-Time Layer: Users communicate via WebSockets. Messages are persisted to Pos
 
 The "Listener" Agent: Every message triggers a background Celery task. This task generates a 1536-dimensional vector embedding of the content and stores it in the MessageEmbedding table.
 
-The "Recommender" Agent: The background worker performs Vector Similarity Search to understand the conversation history. If a specific intent (e.g., boredom, need for focus) is detected, the agent generates a structured recommendation and pushes it back to the client asynchronously.
 
 🗄 Database Schema
 
@@ -89,7 +87,7 @@ unafied-backend/
 │   ├── models/             # SQLModel database tables
 │   ├── services/           # Business logic
 │   │   ├── chat_service.py
-│   │   └── recommendation_agent.py # Pydantic-AI logic
+│   │   
 │   ├── worker.py           # Celery app configuration
 │   └── main.py             # App entry point
 ├── tests/
@@ -143,7 +141,7 @@ Run the Server & Worker:
 Bash
 
     # Terminal 1: API Server
-    uv run uvicorn app.main:app --reload
+    uv run uvicorn main:app --reload
 
     # Terminal 2: Celery Worker
     uv run celery -A app.worker worker --loglevel=info
