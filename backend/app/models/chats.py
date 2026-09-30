@@ -13,15 +13,19 @@ class Conversation(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-    messages: List["Message"] = Relationship(back_populates="conversation")
+    messages: List["Message"] = Relationship(
+        back_populates="conversation", cascade_delete=True, passive_deletes=True
+    )
     participants: List["ConversationParticipant"] = Relationship(
-        back_populates="conversation"
+        back_populates="conversation", cascade_delete=True, passive_deletes=True
     )
 
 
 class Message(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    conversation_id: uuid.UUID = Field(foreign_key="conversation.id", index=True)
+    conversation_id: uuid.UUID = Field(
+        foreign_key="conversation.id", index=True, ondelete="CASCADE"
+    )
     sender_id: Optional[uuid.UUID] = Field(
         default=None, foreign_key="user.id", index=True
     )
@@ -40,7 +44,7 @@ class Message(SQLModel, table=True):
 
 class MessageEmbedding(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    message_id: uuid.UUID = Field(foreign_key="message.id")
+    message_id: uuid.UUID = Field(foreign_key="message.id", ondelete="CASCADE")
     embedding: List[float] = Field(sa_column=Column(Vector(1536)))
 
 
@@ -48,7 +52,9 @@ class ConversationParticipant(SQLModel, table=True):
     __tablename__ = "conversation_participant"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    conversation_id: uuid.UUID = Field(foreign_key="conversation.id", index=True)
+    conversation_id: uuid.UUID = Field(
+        foreign_key="conversation.id", index=True, ondelete="CASCADE"
+    )
     user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
     role: str = Field(default="member")  # "owner" or "member"
     joined_at: datetime = Field(default_factory=datetime.now)
@@ -62,7 +68,9 @@ class UploadedFile(SQLModel, table=True):
     __tablename__ = "uploaded_file"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    conversation_id: uuid.UUID = Field(foreign_key="conversation.id", index=True)
+    conversation_id: uuid.UUID = Field(
+        foreign_key="conversation.id", index=True, ondelete="CASCADE"
+    )
     uploader_id: uuid.UUID = Field(foreign_key="user.id", index=True)
 
     filename: str
@@ -84,5 +92,7 @@ class FileEmbedding(SQLModel, table=True):
     __tablename__ = "file_embedding"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    file_id: uuid.UUID = Field(foreign_key="uploaded_file.id", unique=True)
+    file_id: uuid.UUID = Field(
+        foreign_key="uploaded_file.id", unique=True, ondelete="CASCADE"
+    )
     embedding: List[float] = Field(sa_column=Column(Vector(1536)))
