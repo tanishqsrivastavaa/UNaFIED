@@ -147,7 +147,7 @@ async def chat_websocket(
                 )
 
     except WebSocketDisconnect:
-        await manager.disconnect(conversation_id, user_id)
+        await manager.disconnect(conversation_id, user_id, websocket)
         await manager.broadcast_to_conversation(
             conversation_id,
             {
@@ -160,7 +160,7 @@ async def chat_websocket(
 
     except Exception as e:
         logger.error(f"WebSocket error for user {user_id}: {e}")
-        await manager.disconnect(conversation_id, user_id)
+        await manager.disconnect(conversation_id, user_id, websocket)
 
 
 async def handle_chat_message(

@@ -6,7 +6,7 @@ Handles WebSocket connections and message broadcasting.
 import uuid
 import json
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, Set
 from fastapi import WebSocket
 import redis.asyncio as aioredis
 from app.core.logger import logger
@@ -25,8 +25,8 @@ class ConnectionManager:
     """
 
     def __init__(self):
-        # conversation_id -> {user_id: WebSocket}
-        self.active_connections: Dict[uuid.UUID, Dict[uuid.UUID, WebSocket]] = {}
+        # conversation_id -> {user_id: {WebSocket, ...}}  (a user can have several tabs open)
+        self.active_connections: Dict[uuid.UUID, Dict[uuid.UUID, Set[WebSocket]]] = {}
         self.redis_pubsub: RedisPubSubManager | None = None
         self.instance_id = str(uuid.uuid4())
 
@@ -36,8 +36,8 @@ class ConnectionManager:
 
     async def connect(
         self, websocket: WebSocket, conversation_id: uuid.UUID, user_id: uuid.UUID
-    ):
-        """Accept WebSocket connection and add to active connections"""
+    ) -> bool:
+        """Accept the socket and track it. Returns True if it is the user's first socket here."""
         await websocket.accept()
 
         if conversation_id not in self.active_connections:
@@ -49,24 +49,32 @@ class ConnectionManager:
                     lambda data: self._handle_redis_message(conversation_id, data),
                 )
 
-        self.active_connections[conversation_id][user_id] = websocket
+        sockets = self.active_connections[conversation_id].setdefault(user_id, set())
+        first = not sockets
+        sockets.add(websocket)
         logger.info(f"User {user_id} connected to conversation {conversation_id}")
+        return first
 
-    async def disconnect(self, conversation_id: uuid.UUID, user_id: uuid.UUID):
-        """Remove connection"""
-        if conversation_id in self.active_connections:
-            self.active_connections[conversation_id].pop(user_id, None)
-            logger.info(
-                f"User {user_id} disconnected from conversation {conversation_id}"
-            )
+    async def disconnect(
+        self, conversation_id: uuid.UUID, user_id: uuid.UUID, websocket: WebSocket
+    ) -> bool:
+        """Stop tracking one socket. Returns True if it was the user's last one here."""
+        users = self.active_connections.get(conversation_id)
+        if not users or websocket not in users.get(user_id, set()):
+            return False  # already gone, e.g. a stale close after a reconnect
 
-            # If no more connections, unsubscribe from Redis
-            if not self.active_connections[conversation_id]:
-                del self.active_connections[conversation_id]
-                if self.redis_pubsub:
-                    await self.redis_pubsub.unsubscribe(
-                        f"conversation:{conversation_id}"
-                    )
+        users[user_id].discard(websocket)
+        logger.info(f"User {user_id} disconnected from conversation {conversation_id}")
+        last = not users[user_id]
+        if last:
+            del users[user_id]
+
+        # If no more connections, unsubscribe from Redis
+        if not users:
+            del self.active_connections[conversation_id]
+            if self.redis_pubsub:
+                await self.redis_pubsub.unsubscribe(f"conversation:{conversation_id}")
+        return last
 
     async def broadcast_to_conversation(
         self,
@@ -108,21 +116,23 @@ class ConnectionManager:
         if conversation_id not in self.active_connections:
             return
 
-        disconnected_users = []
+        failed = []
 
-        for user_id, websocket in self.active_connections[conversation_id].items():
+        # Snapshot first: a connect or disconnect can land while we await a send
+        for user_id, sockets in list(self.active_connections[conversation_id].items()):
             if exclude_user and user_id == exclude_user:
                 continue
 
-            try:
-                await websocket.send_json(message)
-            except Exception as e:
-                logger.error(f"Failed to send to user {user_id}: {e}")
-                disconnected_users.append(user_id)
+            for websocket in list(sockets):
+                try:
+                    await websocket.send_json(message)
+                except Exception as e:
+                    logger.error(f"Failed to send to user {user_id}: {e}")
+                    failed.append((user_id, websocket))
 
-        # Clean up disconnected users
-        for user_id in disconnected_users:
-            await self.disconnect(conversation_id, user_id)
+        # Clean up only the sockets that failed
+        for user_id, websocket in failed:
+            await self.disconnect(conversation_id, user_id, websocket)
 
     async def _handle_redis_message(self, conversation_id: uuid.UUID, data: dict):
         """Handle message received from Redis Pub/Sub"""
@@ -138,31 +148,27 @@ class ConnectionManager:
         self, conversation_id: uuid.UUID, user_id: uuid.UUID, message: dict
     ):
         """Send message to a specific user"""
-        if conversation_id in self.active_connections:
-            websocket = self.active_connections[conversation_id].get(user_id)
-            if websocket:
-                try:
-                    await websocket.send_json(message)
-                except Exception as e:
-                    logger.error(f"Failed to send to user {user_id}: {e}")
-                    await self.disconnect(conversation_id, user_id)
+        sockets = self.active_connections.get(conversation_id, {}).get(user_id, set())
+        for websocket in list(sockets):
+            try:
+                await websocket.send_json(message)
+            except Exception as e:
+                logger.error(f"Failed to send to user {user_id}: {e}")
+                await self.disconnect(conversation_id, user_id, websocket)
 
     def is_user_connected(self, conversation_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """Check if a user is connected to a conversation"""
-        return (
-            conversation_id in self.active_connections
-            and user_id in self.active_connections[conversation_id]
-        )
+        return bool(self.active_connections.get(conversation_id, {}).get(user_id))
 
     async def close_all(self):
         """Close all connections (for shutdown)"""
-        for conversation_id in list(self.active_connections.keys()):
-            for user_id in list(self.active_connections[conversation_id].keys()):
-                websocket = self.active_connections[conversation_id][user_id]
-                try:
-                    await websocket.close()
-                except Exception:
-                    pass
+        for users in list(self.active_connections.values()):
+            for sockets in list(users.values()):
+                for websocket in list(sockets):
+                    try:
+                        await websocket.close()
+                    except Exception:
+                        pass
 
         self.active_connections.clear()
 
