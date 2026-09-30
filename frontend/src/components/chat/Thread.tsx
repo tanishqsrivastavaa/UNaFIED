@@ -2,13 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowLeft, RotateCcw } from "lucide-react";
-import type { Message } from "../../lib/api";
+import type { Message, Participant } from "../../lib/api";
 import { readableReply } from "../../lib/reply";
 import { cn } from "../../lib/cn";
+import { useAuthStore } from "../../stores/authStore";
 import { useChatStore, type Peer, type Typing } from "../../stores/chatStore";
 import Cursor from "../ui/Cursor";
 import Display from "../ui/Display";
 import Composer from "./Composer";
+import Invite from "./Invite";
 import { AgentMessage, HumanMessage } from "./Message";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -20,6 +22,7 @@ const TYPING_TTL = 6000;
 const NO_MESSAGES: Message[] = [];
 const NO_TYPING: Typing[] = [];
 const NO_PEERS: Peer[] = [];
+const NO_PARTICIPANTS: Participant[] = [];
 
 function prefersReducedMotion() {
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -32,6 +35,8 @@ export default function Thread({ conversationId }: { conversationId: string }) {
     const notice = useChatStore((s) => s.notice[conversationId] ?? null);
     const typing = useChatStore((s) => s.typing[conversationId] ?? NO_TYPING);
     const peers = useChatStore((s) => s.peers[conversationId] ?? NO_PEERS);
+    const participants = useChatStore((s) => s.participants[conversationId] ?? NO_PARTICIPANTS);
+    const me = useAuthStore((s) => s.user?.id);
     const status = useChatStore((s) => s.status[conversationId] ?? "connecting");
     const title = useChatStore((s) => s.conversations.find((c) => c.id === conversationId)?.title);
     const openThread = useChatStore((s) => s.openThread);
@@ -141,6 +146,13 @@ export default function Thread({ conversationId }: { conversationId: string }) {
 
     const heading = title ?? "";
     const count = messages.length;
+    const others = participants.filter((p) => p.is_active && p.user_id !== me).map((p) => p.email.split("@")[0]);
+    const summary = [
+        others.length ? `with ${others.join(", ")}` : "",
+        count ? `${count} ${count === 1 ? "message" : "messages"}` : "",
+    ]
+        .filter(Boolean)
+        .join("  ·  ");
 
     return (
         <motion.section
@@ -165,12 +177,13 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                         <h1 className="truncate text-body font-semibold tracking-[-0.01em] text-ink" title={heading}>
                             {heading || "\u00a0"}
                         </h1>
-                        {load === "ready" && count > 0 && (
-                            <p className="tnum font-mono text-micro text-ink-4">
-                                {count} {count === 1 ? "message" : "messages"}
+                        {load === "ready" && summary && (
+                            <p className="tnum truncate font-mono text-micro text-ink-4" title={summary}>
+                                {summary}
                             </p>
                         )}
                     </div>
+                    {load === "ready" && <Invite conversationId={conversationId} />}
                     {load === "ready" && (
                         <p className="flex shrink-0 items-center gap-2 text-ink-3" role="status">
                             <Cursor mode={thinking ? "think" : "listen"} className="h-2.5 w-1.5 shadow-none" />
@@ -226,8 +239,8 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                                 className="text-[clamp(60px,8vw,112px)] text-parchment"
                             />
                             <p className="mt-6 max-w-[46ch] text-body text-ink-3">
-                                Ask a question, run some numbers, or look something up. UNaFIED answers here, and
-                                asks before doing anything it can&rsquo;t undo.
+                                Ask UNaFIED anything, or add someone by email to talk together. Once someone joins,
+                                UNaFIED only answers when you mention @unafied.
                             </p>
                         </div>
                     ) : (
@@ -240,14 +253,20 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                         >
                             {rows.map((message, i) => {
                                 const previous = rows[i - 1];
-                                const startsRun = !previous || previous.role !== message.role;
+                                const startsRun =
+                                    !previous || previous.role !== message.role || previous.sender_id !== message.sender_id;
                                 const live = i >= liveFrom;
                                 const inFlight = thinking && i === rows.length - 1;
 
                                 return (
                                     <div key={i} className={cn(i > 0 && (startsRun ? "mt-8" : "mt-1.5"))}>
                                         {message.role === "user" ? (
-                                            <HumanMessage message={message} live={live} />
+                                            <HumanMessage
+                                                message={message}
+                                                live={live}
+                                                mine={message.sender_id === me}
+                                                showName={startsRun}
+                                            />
                                         ) : (
                                             <AgentMessage
                                                 message={message}

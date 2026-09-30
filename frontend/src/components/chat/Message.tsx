@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { Message } from "../../lib/api";
+import { cn } from "../../lib/cn";
 import { clock } from "../../lib/time";
 import Cursor from "../ui/Cursor";
 import Materialize from "../ui/Materialize";
@@ -11,31 +12,49 @@ interface HumanProps {
     message: Message;
     /** Arrived during this visit, so it gets an entrance. */
     live: boolean;
+    /** Sent by the reader: right-aligned. Everyone else sits on the left. */
+    mine: boolean;
+    /** First message in someone else's run: shows who sent it. */
+    showName: boolean;
 }
 
 /** People get the glass and the most contrast — they are what the reader came for. */
-export function HumanMessage({ message, live }: HumanProps) {
+export function HumanMessage({ message, live, mine, showName }: HumanProps) {
     const time = message.created_at ? clock(message.created_at) : "";
+    const stamp = time && (
+        <time
+            dateTime={message.created_at}
+            className="mb-2 shrink-0 font-mono text-micro text-ink-4 opacity-0 transition-opacity duration-300 group-hover/msg:opacity-100 pointer-coarse:hidden"
+        >
+            {time}
+        </time>
+    );
 
     return (
         <motion.article
-            className="group/msg flex items-end justify-end gap-3"
+            className={cn("group/msg flex flex-col", mine ? "items-end" : "items-start")}
             initial={live ? { opacity: 0, y: 14, scale: 0.98 } : false}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.55, ease: EASE }}
-            style={{ transformOrigin: "100% 100%" }}
+            style={{ transformOrigin: mine ? "100% 100%" : "0% 100%" }}
         >
-            {time && (
-                <time
-                    dateTime={message.created_at}
-                    className="mb-2 shrink-0 font-mono text-micro text-ink-4 opacity-0 transition-opacity duration-300 group-hover/msg:opacity-100 pointer-coarse:hidden"
-                >
-                    {time}
-                </time>
+            {!mine && showName && (
+                <p className="mb-1.5 px-1 text-micro font-semibold text-ink-3">
+                    {message.sender_email?.split("@")[0] ?? "Someone"}
+                </p>
             )}
-            <p className="veil max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-br-md px-4 py-2.5 text-body text-ink sm:max-w-[78%]">
-                {message.content}
-            </p>
+            <div className={cn("flex w-full items-end gap-3", mine ? "justify-end" : "justify-start")}>
+                {mine && stamp}
+                <p
+                    className={cn(
+                        "veil max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] px-4 py-2.5 text-body text-ink sm:max-w-[78%]",
+                        mine ? "rounded-br-md" : "rounded-bl-md"
+                    )}
+                >
+                    {message.content}
+                </p>
+                {!mine && stamp}
+            </div>
         </motion.article>
     );
 }
