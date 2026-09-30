@@ -3,10 +3,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, UserPlus, X } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
 import { plainError } from "../../lib/errors";
+import { cn } from "../../lib/cn";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-/** Header control that adds someone to the conversation by email. Adding is a human action, so it stays parchment. */
+/** Header control that adds someone to the conversation by email. Quiet until opened; adding is a human action, so it is never sage. */
 export default function Invite({ conversationId }: { conversationId: string }) {
     const invite = useChatStore((s) => s.invite);
     const [open, setOpen] = useState(false);
@@ -62,13 +63,14 @@ export default function Invite({ conversationId }: { conversationId: string }) {
             <button
                 ref={buttonRef}
                 type="button"
-                className="btn btn-quiet btn-icon"
+                className={cn("btn btn-quiet btn-icon text-ink-4", open && "bg-fill-2 text-ink")}
+                title="Add someone"
                 aria-label="Add someone"
                 aria-expanded={open}
                 aria-controls={panelId}
                 onClick={toggle}
             >
-                <UserPlus size={18} aria-hidden="true" />
+                <UserPlus size={17} aria-hidden="true" />
             </button>
 
             <AnimatePresence>
@@ -77,14 +79,14 @@ export default function Invite({ conversationId }: { conversationId: string }) {
                         id={panelId}
                         onSubmit={submit}
                         aria-label="Add someone to this conversation"
-                        className="veil absolute right-0 top-12 z-20 w-[340px] rounded-lg p-4 max-sm:fixed max-sm:inset-x-5 max-sm:top-[68px] max-sm:w-auto"
-                        initial={{ opacity: 0, y: -6 }}
+                        className="absolute right-0 top-12 z-20 w-[340px] rounded-2xl border border-line-1 bg-coal p-4 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.8)] max-sm:fixed max-sm:inset-x-4 max-sm:top-[68px] max-sm:w-auto"
+                        initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
-                        transition={{ duration: 0.3, ease: EASE }}
+                        exit={{ opacity: 0, y: -4, transition: { duration: 0.15 } }}
+                        transition={{ duration: 0.25, ease: EASE }}
                     >
                         <div className="flex items-center justify-between">
-                            <label htmlFor={`${panelId}-email`} className="text-sm font-semibold text-ink">
+                            <label htmlFor={`${panelId}-email`} className="text-sm font-medium text-ink">
                                 Add someone by email
                             </label>
                             <button
@@ -112,7 +114,7 @@ export default function Invite({ conversationId }: { conversationId: string }) {
                         />
 
                         {error && (
-                            <p id={`${panelId}-error`} role="alert" className="mt-2 flex items-start gap-2 text-sm text-ink-2">
+                            <p id={`${panelId}-error`} role="alert" className="mt-2.5 flex items-start gap-2 text-sm text-ink-2">
                                 <AlertCircle size={15} className="mt-0.5 shrink-0 text-ink-3" aria-hidden="true" />
                                 {error}
                             </p>
