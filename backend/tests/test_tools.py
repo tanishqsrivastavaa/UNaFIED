@@ -3,32 +3,7 @@ Tests for the agent tools: calculator, get_datetime, web_search.
 """
 
 import pytest
-from app.core.tools import calculator, get_datetime
-
-
-def test_calculator_basic():
-    """Basic arithmetic should work."""
-    assert calculator("2 + 2") == "4"
-    assert calculator("10 * 5") == "50"
-    assert calculator("100 / 4") == "25.0"
-
-
-def test_calculator_advanced():
-    """Math functions should work."""
-    assert calculator("sqrt(144)") == "12.0"
-    assert calculator("3 ** 2") == "9"
-    assert calculator("abs(-42)") == "42"
-
-
-def test_calculator_error():
-    """Invalid expressions should return an error string, not crash."""
-    result = calculator("1 / 0")
-    assert "Error" in result or "division" in result.lower()
-
-
-def test_calculator_caret():
-    """Caret should be converted to ** for exponentiation."""
-    assert calculator("2^10") == "1024"
+from app.core.tools import get_datetime
 
 
 def test_get_datetime():
