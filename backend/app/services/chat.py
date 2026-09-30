@@ -18,6 +18,10 @@ from pydantic_ai import (
     UserPromptPart,
 )
 from ..core.logger import logger
+from collections.abc import Callable
+from contextlib import AbstractContextManager
+
+SessionFactory = Callable[[], AbstractContextManager[Session]]
 
 
 class ChatService:
@@ -262,10 +266,16 @@ class ChatService:
         conversation_id: uuid.UUID,
         user_id: uuid.UUID,
         limit: int = 3,
+        query_vector: list[float] | None = None,
     ) -> str:
-        """Search for relevant context using RAG (scoped to conversations user has access to)"""
+        """Search for relevant context using RAG (scoped to conversations user has access to).
 
-        query_vector = await generate_embedding(query_text)
+        Pass query_vector when the caller has already embedded query_text, so the
+        provider isn't called twice and no session is held across the call.
+        """
+
+        if query_vector is None:
+            query_vector = await generate_embedding(query_text)
 
         if not query_vector:
             return ""
@@ -403,7 +413,7 @@ class ChatService:
 
     @staticmethod
     async def stream_chat_message_websocket(
-        session: Session,
+        sessions: SessionFactory,
         conversation_id: uuid.UUID,
         user_id: uuid.UUID,
         message_in: MessageCreate,
@@ -413,55 +423,62 @@ class ChatService:
         Stream chat message for WebSocket (returns dict chunks instead of JSON strings).
         Used by WebSocket endpoint to broadcast AI responses.
 
+        Takes a session factory, not a session: the read and write phases each open
+        a short session, and none is held while the model streams.
+
         Args:
             skip_user_message: If True, don't save user message (already saved by WS handler)
         """
 
-        # Verify access
         from ..services.permissions import ConversationPermissions
 
-        if not ConversationPermissions.can_send_message(
-            session, conversation_id, user_id
-        ):
-            raise ValueError("Access denied")
+        query_vector = await generate_embedding(message_in.content)
 
         user_message_id = None
 
-        if not skip_user_message:
-            # Save user message
-            user_message = Message(
-                conversation_id=conversation_id,
-                sender_id=user_id,
-                role="user",
-                content=message_in.content,
+        with sessions() as session:
+            if not ConversationPermissions.can_send_message(
+                session, conversation_id, user_id
+            ):
+                raise ValueError("Access denied")
+
+            if not skip_user_message:
+                user_message = Message(
+                    conversation_id=conversation_id,
+                    sender_id=user_id,
+                    role="user",
+                    content=message_in.content,
+                )
+
+                session.add(user_message)
+                session.commit()
+                session.refresh(user_message)
+                user_message_id = user_message.id
+
+            rag_context = await ChatService.search_relevant_context(
+                session,
+                message_in.content,
+                conversation_id,
+                user_id,
+                query_vector=query_vector,
             )
 
-            session.add(user_message)
-            session.commit()
-            session.refresh(user_message)
-            user_message_id = user_message.id
+            recent_history = ChatService.get_chat_history(session, conversation_id)
 
-            # Generate embedding (async in background ideally)
-            user_vector = await generate_embedding(message_in.content)
-            if user_vector:
+        if user_message_id is not None and query_vector:
+            with sessions() as session:
                 session.add(
-                    MessageEmbedding(message_id=user_message.id, embedding=user_vector)
+                    MessageEmbedding(
+                        message_id=user_message_id, embedding=query_vector
+                    )
                 )
                 session.commit()
-
-        # RAG and history
-        rag_context = await ChatService.search_relevant_context(
-            session, message_in.content, conversation_id, user_id
-        )
-
-        recent_history = ChatService.get_chat_history(session, conversation_id)
 
         if recent_history:
             recent_history.pop()
 
         augmented_prompt = f"{rag_context}\n\nUSER QUERY: {message_in.content}"
 
-        # Stream response
         async with chat_agent.run_stream(
             augmented_prompt, message_history=recent_history, deps=augmented_prompt
         ) as result:
@@ -479,17 +496,16 @@ class ChatService:
 
                 accumulated_text = current_full_text
 
-            # Parse final result
-            suggestion_data = None
-            final_text = accumulated_text
-            try:
-                parsed = json.loads(accumulated_text)
-                final_text = parsed.get("chat_message", accumulated_text)
-                suggestion_data = parsed.get("suggestion")
-            except json.JSONDecodeError:
-                pass
+        suggestion_data = None
+        final_text = accumulated_text
+        try:
+            parsed = json.loads(accumulated_text)
+            final_text = parsed.get("chat_message", accumulated_text)
+            suggestion_data = parsed.get("suggestion")
+        except json.JSONDecodeError:
+            pass
 
-            # Save assistant message
+        with sessions() as session:
             assistant_message = Message(
                 conversation_id=conversation_id,
                 sender_id=None,
@@ -501,17 +517,15 @@ class ChatService:
             session.add(assistant_message)
             session.commit()
             session.refresh(assistant_message)
+            assistant_message_id = assistant_message.id
 
-            # Yield final suggestion if present
-            if suggestion_data:
-                yield {"chat_message": "", "suggestion": suggestion_data}
+        if suggestion_data:
+            yield {"chat_message": "", "suggestion": suggestion_data}
 
-            # Generate embedding (async)
-            ai_vector = await generate_embedding(final_text)
-            if ai_vector:
+        ai_vector = await generate_embedding(final_text)
+        if ai_vector:
+            with sessions() as session:
                 session.add(
-                    MessageEmbedding(
-                        message_id=assistant_message.id, embedding=ai_vector
-                    )
+                    MessageEmbedding(message_id=assistant_message_id, embedding=ai_vector)
                 )
                 session.commit()
