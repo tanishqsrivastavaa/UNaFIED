@@ -193,8 +193,9 @@ async def handle_chat_message(
 
     # Check if user can send messages
     with sessions() as s:
-        can_send = ConversationPermissions.can_send_message(
-            s, conversation_id, user_id
+        can_send = ConversationPermissions.can_send_message(s, conversation_id, user_id)
+        assistant_replies = ChatService.assistant_should_reply(
+            s, conversation_id, content
         )
     if not can_send:
         await websocket.send_json(
@@ -238,6 +239,18 @@ async def handle_chat_message(
                     "is_proactive": False,
                     "created_at": created_at.isoformat(),
                 },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+        if not assistant_replies:
+            return
+
+        await manager.broadcast_to_conversation(
+            conversation_id,
+            {
+                "type": "stream_start",
+                "data": {"role": "assistant"},
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )

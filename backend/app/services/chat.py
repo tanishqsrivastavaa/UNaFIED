@@ -1,4 +1,5 @@
 import uuid, json
+import re
 from datetime import datetime
 from ..models.user import User
 from ..schemas.participants import ParticipantRead
@@ -25,6 +26,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
+ASSISTANT_MENTION = re.compile(r"(?<![\w.])@unafied\b", re.IGNORECASE)
 
 
 class ChatService:
@@ -616,3 +618,17 @@ class ChatService:
             ],
             "participants": participants,
         }
+
+    @staticmethod
+    def assistant_should_reply(
+        session: Session, conversation_id: uuid.UUID, content: str
+    ) -> bool:
+        active = session.exec(
+            select(func.count())
+            .select_from(ConversationParticipant)
+            .where(
+                ConversationParticipant.conversation_id == conversation_id,
+                ConversationParticipant.is_active == True,
+            )
+        ).one()
+        return active < 2 or bool(ASSISTANT_MENTION.search(content))
