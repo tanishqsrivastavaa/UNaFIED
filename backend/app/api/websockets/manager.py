@@ -28,6 +28,7 @@ class ConnectionManager:
         # conversation_id -> {user_id: WebSocket}
         self.active_connections: Dict[uuid.UUID, Dict[uuid.UUID, WebSocket]] = {}
         self.redis_pubsub: RedisPubSubManager | None = None
+        self.instance_id = str(uuid.uuid4())
 
     def set_redis_pubsub(self, redis_client: aioredis.Redis):
         """Initialize Redis Pub/Sub manager"""
@@ -83,16 +84,19 @@ class ConnectionManager:
         """
         # Publish to Redis (other FastAPI instances will receive)
         if self.redis_pubsub:
-            await self.redis_pubsub.publish(
+            await self.redis_pubsub.publish(  # This broadcasts to the subscribers
                 f"conversation:{conversation_id}",
                 {
                     **message,
                     "exclude_user": str(exclude_user) if exclude_user else None,
+                    "origin": self.instance_id,
                 },
             )
 
         # Broadcast to local connections
-        await self._broadcast_local(conversation_id, message, exclude_user)
+        await self._broadcast_local(
+            conversation_id, message, exclude_user
+        )  # This broadcasts to the socket
 
     async def _broadcast_local(
         self,
@@ -122,6 +126,9 @@ class ConnectionManager:
 
     async def _handle_redis_message(self, conversation_id: uuid.UUID, data: dict):
         """Handle message received from Redis Pub/Sub"""
+        if data.pop("origin", None) == self.instance_id:
+            return
+
         exclude_user_str = data.pop("exclude_user", None)
         exclude_user = uuid.UUID(exclude_user_str) if exclude_user_str else None
 
