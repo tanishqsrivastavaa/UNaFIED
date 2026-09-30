@@ -133,6 +133,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     /** The no-socket path: the HTTP stream the app used before sockets existed. */
     const sendOverHttp = async (id: string, content: string, pending: Pending) => {
         let raw = "";
+        set((s) => ({ streaming: { ...s.streaming, [id]: "" } }));
         try {
             await sendMessageStream(
                 id,
@@ -149,7 +150,10 @@ export const useChatStore = create<ChatState>((set, get) => {
         }
 
         set((s) => ({
-            messages: { ...s.messages, [id]: [...(s.messages[id] ?? []), assistantRow(readableReply(raw), null)] },
+            // A shared conversation streams nothing back unless someone mentions the assistant
+            messages: raw
+                ? { ...s.messages, [id]: [...(s.messages[id] ?? []), assistantRow(readableReply(raw), null)] }
+                : s.messages,
             streaming: { ...s.streaming, [id]: null },
             pending: { ...s.pending, [id]: null },
         }));
@@ -162,11 +166,14 @@ export const useChatStore = create<ChatState>((set, get) => {
             case "message": {
                 const message = event.data as unknown as Message;
                 const me = useAuthStore.getState().user?.id;
+                const pending = get().pending[id];
+                let settled = false;
                 set((s) => {
                     const list = s.messages[id] ?? [];
                     if (list.some((m) => m.id === message.id)) return s;
-                    const pending = s.pending[id];
-                    const mine = pending && message.sender_id === me && message.content === pending.content;
+                    const mine =
+                        pending && s.pending[id] === pending && message.sender_id === me && message.content === pending.content;
+                    settled = !!mine;
                     return {
                         ...s,
                         messages: {
@@ -178,6 +185,13 @@ export const useChatStore = create<ChatState>((set, get) => {
                         pending: mine ? { ...s.pending, [id]: null } : s.pending,
                     };
                 });
+                // The server has the message, so the send is done; a reply, if any, arrives separately
+                if (settled && pending) pending.resolve(true);
+                break;
+            }
+
+            case "stream_start": {
+                set((s) => ({ ...s, streaming: { ...s.streaming, [id]: "" } }));
                 break;
             }
 
@@ -383,7 +397,6 @@ export const useChatStore = create<ChatState>((set, get) => {
                             },
                         ],
                     },
-                    streaming: { ...s.streaming, [id]: "" },
                     notice: { ...s.notice, [id]: null },
                     pending: { ...s.pending, [id]: pending },
                 }));
