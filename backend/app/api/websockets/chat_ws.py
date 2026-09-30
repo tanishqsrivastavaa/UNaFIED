@@ -78,18 +78,19 @@ async def chat_websocket(
             return
 
     # Connect
-    await manager.connect(websocket, conversation_id, user_id)
+    first = await manager.connect(websocket, conversation_id, user_id)
 
-    # Notify others that user joined
-    await manager.broadcast_to_conversation(
-        conversation_id,
-        {
-            "type": "user_joined",
-            "data": {"user_id": str(user_id), "email": email},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        },
-        exclude_user=user_id,  # Don't send to the user who just joined
-    )
+    # Notify others that user joined; a second tab or a reconnect isn't a new arrival
+    if first:
+        await manager.broadcast_to_conversation(
+            conversation_id,
+            {
+                "type": "user_joined",
+                "data": {"user_id": str(user_id), "email": email},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            exclude_user=user_id,  # Don't send to the user who just joined
+        )
 
     try:
         while True:
@@ -147,15 +148,17 @@ async def chat_websocket(
                 )
 
     except WebSocketDisconnect:
-        await manager.disconnect(conversation_id, user_id, websocket)
-        await manager.broadcast_to_conversation(
-            conversation_id,
-            {
-                "type": "user_left",
-                "data": {"user_id": str(user_id), "email": email},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
-        )
+        last = await manager.disconnect(conversation_id, user_id, websocket)
+        # Only announce a departure when this was the user's last open socket
+        if last:
+            await manager.broadcast_to_conversation(
+                conversation_id,
+                {
+                    "type": "user_left",
+                    "data": {"user_id": str(user_id), "email": email},
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
         logger.info(f"User {user_id} disconnected from conversation {conversation_id}")
 
     except Exception as e:
