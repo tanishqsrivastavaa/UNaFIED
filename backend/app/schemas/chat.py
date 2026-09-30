@@ -1,3 +1,4 @@
+from .participants import ParticipantRead
 from sqlmodel import SQLModel, Field
 from datetime import datetime
 from typing import List, Optional
@@ -22,6 +23,7 @@ class ConversationRead(SQLModel):
 class MessageRead(SQLModel):
     id: uuid.UUID
     sender_id: Optional[uuid.UUID]
+    sender_email: Optional[str] = None
     role: str
     content: str
     suggestion: dict | None = None
@@ -31,6 +33,7 @@ class MessageRead(SQLModel):
 
 class ConversationDetail(ConversationRead):
     messages: List[MessageRead] = []
+    participants: List[ParticipantRead] = []
 
 
 class MessageCreate(SQLModel):
