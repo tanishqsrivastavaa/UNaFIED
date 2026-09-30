@@ -30,9 +30,9 @@ export default function SignupPage() {
 
     return (
         <>
-            <h2 className="text-xl font-semibold tracking-[-0.015em] text-ink">Create your account</h2>
+            <h1 className="text-xl font-medium tracking-[-0.02em] text-ink">Create your account</h1>
 
-            <form className="mt-7 flex flex-col gap-5" onSubmit={handleSubmit} aria-busy={pending}>
+            <form className="mt-8 flex flex-col gap-5" onSubmit={handleSubmit} aria-busy={pending}>
                 <EmailField
                     id="signup-email"
                     label="Email"
@@ -72,11 +72,11 @@ export default function SignupPage() {
                 </button>
             </form>
 
-            <p className="mt-8 text-sm text-ink-3">
+            <p className="mt-8 text-sm text-ink-4">
                 Already have an account?{" "}
                 <Link
                     to="/login"
-                    className="rounded-xs font-medium text-ink underline decoration-line-3 underline-offset-4 transition-colors duration-200 hover:decoration-ink"
+                    className="rounded-xs font-medium text-ink-2 underline decoration-line-3 underline-offset-4 transition-colors duration-200 hover:text-ink hover:decoration-ink"
                 >
                     Sign in
                 </Link>
