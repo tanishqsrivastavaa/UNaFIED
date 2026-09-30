@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from app.api.v1 import users
 from app.api.routes import chat
-from app.api.routes import tools
+
+# from app.api.routes import tools
 from app.api.websockets import chat_ws
 from app.api.websockets.manager import get_connection_manager
 from app.core.redis import get_redis
@@ -54,7 +55,7 @@ app.add_middleware(
 # --- Routers ---
 app.include_router(users.router, prefix="/api/v1", tags=["users"])
 app.include_router(chat.router, prefix="/api/v1/chats", tags=["chats"])
-app.include_router(tools.router, prefix="/api/v1/tools", tags=["tools"])
+# app.include_router(tools.router, prefix="/api/v1/tools", tags=["tools"])
 app.include_router(chat_ws.router, prefix="/api/v1", tags=["websockets"])
 
 
