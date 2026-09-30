@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, LoaderCircle, RotateCcw } from "lucide-react";
 import { executeTool, type Message } from "../../lib/api";
+import Presence from "../ui/Presence";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -18,8 +19,8 @@ function show(value: unknown): string {
 }
 
 /**
- * An action the agent wants to take but won't without a yes. Shaped like a
- * ticket: above the tear line is what it will do, the stub is where you decide.
+ * An action the assistant wants to take but won't without a yes. Above the
+ * hairline is what it will do; below it is where you decide.
  */
 export default function Ticket({ suggestion }: { suggestion: Suggestion }) {
     const [state, setState] = useState<RunState>("idle");
@@ -54,21 +55,24 @@ export default function Ticket({ suggestion }: { suggestion: Suggestion }) {
                 <motion.section
                     aria-label={`Proposed action: ${suggestion.label}`}
                     aria-busy={running}
-                    className="mt-4 w-full max-w-[460px]"
-                    initial={{ opacity: 0, y: 10 }}
+                    className="mt-4 w-full max-w-[460px] rounded-2xl border border-sage-line bg-sage-wash"
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4, transition: { duration: 0.25, ease: EASE } }}
-                    transition={{ duration: 0.6, ease: EASE }}
+                    exit={{ opacity: 0, y: -4, transition: { duration: 0.2, ease: EASE } }}
+                    transition={{ duration: 0.4, ease: EASE }}
                 >
                     <p className="sr-only" role="status" aria-live="polite">
                         {status}
                     </p>
 
-                    <div className="ticket-top rounded-t-[18px] border border-b-0 border-blush-line bg-blush-wash px-5 pb-5 pt-4 backdrop-blur-xl">
-                        <p className="eyebrow text-blush">{state === "done" ? "Approved" : "Needs your approval"}</p>
-                        <p className="mt-2 text-lg font-semibold tracking-[-0.01em] text-ink">{suggestion.label}</p>
+                    <div className="px-5 pb-4 pt-4">
+                        <p className="flex items-center gap-2 text-meta font-medium text-sage">
+                            <Presence />
+                            {state === "done" ? "Approved" : "Needs your approval"}
+                        </p>
+                        <p className="mt-2 text-body font-medium tracking-[-0.01em] text-ink">{suggestion.label}</p>
                         {params.length > 0 && (
-                            <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 font-mono text-meta">
+                            <dl className="tnum mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-meta">
                                 {params.map(([key, value]) => (
                                     <Fragment key={key}>
                                         <dt className="text-ink-4">{key}</dt>
@@ -81,8 +85,7 @@ export default function Ticket({ suggestion }: { suggestion: Suggestion }) {
                         )}
                     </div>
 
-                    <div className="ticket-stub relative rounded-b-[18px] border border-t-0 border-blush-line bg-blush-wash px-5 py-3 backdrop-blur-xl">
-                        <span aria-hidden="true" className="absolute inset-x-4 top-0 border-t border-dashed border-blush-line" />
+                    <div className="border-t border-sage-line px-5 py-3">
 
                         {state === "done" ? (
                             <motion.div
@@ -91,7 +94,7 @@ export default function Ticket({ suggestion }: { suggestion: Suggestion }) {
                                 transition={{ duration: 0.45, ease: EASE }}
                                 className="py-1"
                             >
-                                <p className="flex items-center gap-2 text-sm font-medium text-blush">
+                                <p className="flex items-center gap-2 text-sm font-medium text-sage">
                                     <Check size={15} aria-hidden="true" />
                                     Done
                                 </p>
@@ -99,7 +102,7 @@ export default function Ticket({ suggestion }: { suggestion: Suggestion }) {
                                     <pre
                                         tabIndex={0}
                                         aria-label="Result"
-                                        className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-sm font-mono text-meta leading-5 text-ink-3"
+                                        className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-sm font-sans text-meta leading-5 text-ink-3"
                                     >
                                         {result}
                                     </pre>
@@ -107,7 +110,7 @@ export default function Ticket({ suggestion }: { suggestion: Suggestion }) {
                             </motion.div>
                         ) : (
                             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                                <p className="min-w-0 truncate font-mono text-micro text-ink-4">
+                                <p className="min-w-0 truncate text-micro text-ink-4">
                                     {state === "failed" ? "That didn't go through." : suggestion.tool_name}
                                 </p>
                                 <div className="ml-auto flex items-center gap-1.5">
