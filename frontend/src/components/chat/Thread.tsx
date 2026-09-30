@@ -7,8 +7,7 @@ import { readableReply } from "../../lib/reply";
 import { cn } from "../../lib/cn";
 import { useAuthStore } from "../../stores/authStore";
 import { useChatStore, type Peer, type Typing } from "../../stores/chatStore";
-import Cursor from "../ui/Cursor";
-import Display from "../ui/Display";
+import Presence from "../ui/Presence";
 import Composer from "./Composer";
 import Invite from "./Invite";
 import { AgentMessage, HumanMessage } from "./Message";
@@ -135,24 +134,22 @@ export default function Thread({ conversationId }: { conversationId: string }) {
 
     const handleTyping = (value: boolean) => setTyping(conversationId, value);
 
-    const activity = [
-        peers.length ? `${peers.length} ${peers.length === 1 ? "other" : "others"} here` : "",
-        typingNow.length
-            ? `${typingNow.map((t) => t.email.split("@")[0]).join(", ")} ${typingNow.length === 1 ? "is" : "are"} typing…`
-            : "",
-    ]
-        .filter(Boolean)
-        .join("  ·  ");
+    const activity = typingNow.length
+        ? `${typingNow.map((t) => t.email.split("@")[0]).join(", ")} ${typingNow.length === 1 ? "is" : "are"} typing…`
+        : "";
 
     const heading = title ?? "";
-    const count = messages.length;
-    const others = participants.filter((p) => p.is_active && p.user_id !== me).map((p) => p.email.split("@")[0]);
-    const summary = [
-        others.length ? `with ${others.join(", ")}` : "",
-        count ? `${count} ${count === 1 ? "message" : "messages"}` : "",
-    ]
-        .filter(Boolean)
-        .join("  ·  ");
+    // Everyone else in the conversation, marked when they have it open right now.
+    const here = new Set(peers.map((p) => p.userId));
+    const members = participants.filter((p) => p.is_active && p.user_id !== me);
+    const people = [
+        ...members.map((p) => ({ id: p.user_id, name: p.email.split("@")[0], here: here.has(p.user_id) })),
+        ...peers
+            .filter((p) => p.userId !== me && !members.some((m) => m.user_id === p.userId))
+            .map((p) => ({ id: p.userId, name: p.email.split("@")[0], here: true })),
+    ];
+    const connection =
+        status === "online" ? (thinking ? "Thinking" : "Listening") : status === "connecting" ? "Connecting…" : "Offline";
 
     return (
         <motion.section
@@ -161,11 +158,11 @@ export default function Thread({ conversationId }: { conversationId: string }) {
             className="absolute inset-0 flex flex-col"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.18, ease: EASE } }}
-            transition={{ duration: 0.45, ease: EASE }}
+            exit={{ opacity: 0, transition: { duration: 0.15, ease: EASE } }}
+            transition={{ duration: 0.3, ease: EASE }}
         >
             <header className="absolute inset-x-0 top-0 z-10">
-                <div className={cn(MEASURE, "flex h-16 items-center gap-2")}>
+                <div className={cn(MEASURE, "flex h-16 items-center gap-1")}>
                     <Link
                         to="/chat"
                         aria-label="Back to conversations"
@@ -174,22 +171,39 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                         <ArrowLeft size={18} aria-hidden="true" />
                     </Link>
                     <div className="min-w-0 flex-1">
-                        <h1 className="truncate text-body font-semibold tracking-[-0.01em] text-ink" title={heading}>
+                        <h1 className="truncate text-body font-medium tracking-[-0.012em] text-ink" title={heading}>
                             {heading || "\u00a0"}
                         </h1>
-                        {load === "ready" && summary && (
-                            <p className="tnum truncate font-mono text-micro text-ink-4" title={summary}>
-                                {summary}
+                        {load === "ready" && people.length > 0 && (
+                            <p className="flex min-w-0 items-center gap-1 overflow-hidden text-meta text-ink-4" aria-live="polite">
+                                <span className="shrink-0">with</span>
+                                {people.map((person, i) => (
+                                    <span key={person.id} className="flex min-w-0 items-center gap-1.5">
+                                        <span className={cn("truncate", person.here && "text-ink-2")}>{person.name}</span>
+                                        {person.here && (
+                                            <>
+                                                <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-ink-2" />
+                                                <span className="sr-only">(here now)</span>
+                                            </>
+                                        )}
+                                        {i < people.length - 1 && <span aria-hidden="true">,</span>}
+                                    </span>
+                                ))}
                             </p>
                         )}
                     </div>
                     {load === "ready" && <Invite conversationId={conversationId} />}
+                    {/* Said aloud always; shown only when the connection needs attention. */}
                     {load === "ready" && (
-                        <p className="flex shrink-0 items-center gap-2 text-ink-3" role="status">
-                            <Cursor mode={thinking ? "think" : "listen"} className="h-2.5 w-1.5 shadow-none" />
-                            <span className="eyebrow">
-                                {status === "online" ? (thinking ? "Thinking" : "Listening") : status === "connecting" ? "Connecting" : "Offline"}
-                            </span>
+                        <p
+                            role="status"
+                            className={cn(
+                                "flex h-10 shrink-0 items-center gap-2 pl-2 text-meta text-ink-3",
+                                status === "online" && "sr-only",
+                            )}
+                        >
+                            <span aria-hidden="true" className="size-1.5 rounded-full bg-ink-4" />
+                            {connection}
                         </p>
                     )}
                 </div>
@@ -202,23 +216,23 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                 aria-busy={load === "loading"}
             >
                 <div
-                    className={cn(MEASURE, "flex min-h-full flex-col justify-end pt-32")}
-                    style={{ paddingBottom: "calc(var(--composer-h, 96px) + 24px)" }}
+                    className={cn(MEASURE, "flex min-h-full flex-col justify-end pt-28")}
+                    style={{ paddingBottom: "calc(var(--composer-h, 96px) + 12px)" }}
                 >
                     {load === "loading" ? (
                         <motion.p
-                            className="flex items-center gap-3 font-mono text-sm text-ink-3"
+                            className="my-auto flex items-center justify-center gap-3 text-sm text-ink-3"
                             role="status"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.4, delay: 0.25 }}
                         >
-                            <Cursor mode="think" className="h-3.5 w-2 shadow-none" />
+                            <Presence mode="think" />
                             Opening conversation…
                         </motion.p>
                     ) : load === "error" ? (
-                        <div role="alert" className="max-w-[44ch]">
-                            <p className="flex items-center gap-2.5 text-lg font-semibold text-ink">
+                        <div role="alert" className="my-auto max-w-[44ch]">
+                            <p className="flex items-center gap-2.5 text-lg font-medium text-ink">
                                 <AlertCircle size={18} className="text-ink-3" aria-hidden="true" />
                                 This conversation didn&rsquo;t load.
                             </p>
@@ -231,14 +245,10 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                             </button>
                         </div>
                     ) : rows.length === 0 ? (
-                        <div>
-                            <Display
-                                as="h2"
-                                lines={["Say", "something."]}
-                                cursor
-                                className="text-[clamp(60px,8vw,112px)] text-parchment"
-                            />
-                            <p className="mt-6 max-w-[46ch] text-body text-ink-3">
+                        <div className="my-auto flex flex-col items-center text-center">
+                            <Presence mode="listen" className="size-2.5 shadow-[0_0_28px_6px_rgb(179_192_165/0.22)]" />
+                            <h2 className="mt-7 text-lg font-medium tracking-[-0.015em] text-ink">Say something.</h2>
+                            <p className="mt-2 max-w-[44ch] text-base text-ink-3">
                                 Ask UNaFIED anything, or add someone by email to talk together. Once someone joins,
                                 UNaFIED only answers when you mention @unafied.
                             </p>
@@ -247,9 +257,9 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                         <motion.div
                             role="log"
                             aria-label="Messages"
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6, ease: EASE }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.4, ease: EASE }}
                         >
                             {rows.map((message, i) => {
                                 const previous = rows[i - 1];
@@ -259,7 +269,7 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                                 const inFlight = thinking && i === rows.length - 1;
 
                                 return (
-                                    <div key={i} className={cn(i > 0 && (startsRun ? "mt-8" : "mt-1.5"))}>
+                                    <div key={i} className={cn(i > 0 && (startsRun ? "mt-7" : "mt-1.5"))}>
                                         {message.role === "user" ? (
                                             <HumanMessage
                                                 message={message}
@@ -281,29 +291,29 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                         </motion.div>
                     )}
 
-                    {activity && (
-                        <p
-                            className="mt-4 flex items-center gap-2 self-start font-mono text-micro text-ink-4"
-                            role="status"
-                            aria-live="polite"
-                        >
-                            <Cursor mode="listen" className="h-2 w-1 shadow-none" />
-                            {activity}
-                        </p>
-                    )}
-
                     {notice && (
                         <motion.p
                             role="alert"
-                            className="mt-6 flex items-start gap-2.5 self-start rounded-md border border-line-2 bg-veil-1 px-3.5 py-2.5 text-sm text-ink-2"
-                            initial={{ opacity: 0, y: 6 }}
+                            className="mt-6 flex items-start gap-2.5 self-start rounded-md bg-fill-2 px-3.5 py-2.5 text-sm text-ink-2"
+                            initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.4, ease: EASE }}
+                            transition={{ duration: 0.3, ease: EASE }}
                         >
                             <AlertCircle size={16} className="mt-0.5 shrink-0 text-ink-3" aria-hidden="true" />
                             {notice}
                         </motion.p>
                     )}
+
+                    <p
+                        className={cn(
+                            "mt-4 h-4 self-start text-meta text-ink-3 transition-opacity duration-300",
+                            activity ? "opacity-100" : "opacity-0",
+                        )}
+                        role="status"
+                        aria-live="polite"
+                    >
+                        {activity}
+                    </p>
                 </div>
             </div>
 
@@ -311,9 +321,9 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                 <motion.div
                     ref={composerRef}
                     className="absolute inset-x-0 bottom-0 z-10"
-                    initial={{ opacity: 0, y: 12 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
+                    transition={{ duration: 0.4, delay: 0.05, ease: EASE }}
                 >
                     <Composer onSend={(content) => send(conversationId, content)} onTyping={handleTyping} busy={thinking} />
                 </motion.div>
