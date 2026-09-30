@@ -13,14 +13,14 @@ from fastapi import (
     Query,
     HTTPException,
 )
-from sqlmodel import Session
-from app.db.db import get_session
+from app.db.db import SessionLocal
 from app.api.websockets.manager import get_connection_manager, ConnectionManager
 from app.api.websockets.auth import authenticate_ws_token
 from app.services.permissions import ConversationPermissions
-from app.services.chat import ChatService
+from app.services.chat import ChatService, SessionFactory
 from app.schemas.chat import MessageCreate
 from app.core.logger import logger
+
 
 router = APIRouter()
 
@@ -30,7 +30,6 @@ async def chat_websocket(
     websocket: WebSocket,
     conversation_id: uuid.UUID,
     token: str = Query(...),  # JWT passed as query param
-    session: Session = Depends(get_session),
     manager: ConnectionManager = Depends(get_connection_manager),
 ):
     """
@@ -62,29 +61,34 @@ async def chat_websocket(
 
     # Authenticate user
     try:
-        user = await authenticate_ws_token(token, session)
+        with SessionLocal() as s:
+            user = await authenticate_ws_token(token, s)
     except HTTPException as e:
         await websocket.close(code=1008, reason=e.detail)
         return
 
+    user_id, email = user.id, user.email
+
     # Check access
-    has_access = ConversationPermissions.can_view(session, conversation_id, user.id)
-    if not has_access:
-        await websocket.close(code=1008, reason="Access denied")
-        return
+
+    with SessionLocal() as s:
+        has_access = ConversationPermissions.can_view(s, conversation_id, user_id)
+        if not has_access:
+            await websocket.close(code=1008, reason="Access denied")
+            return
 
     # Connect
-    await manager.connect(websocket, conversation_id, user.id)
+    await manager.connect(websocket, conversation_id, user_id)
 
     # Notify others that user joined
     await manager.broadcast_to_conversation(
         conversation_id,
         {
             "type": "user_joined",
-            "data": {"user_id": str(user.id), "email": user.email},
+            "data": {"user_id": str(user_id), "email": email},
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
-        exclude_user=user.id,  # Don't send to the user who just joined
+        exclude_user=user_id,  # Don't send to the user who just joined
     )
 
     try:
@@ -109,10 +113,11 @@ async def chat_websocket(
                 # Handle chat message
                 await handle_chat_message(
                     websocket=websocket,
-                    session=session,
+                    sessions=SessionLocal,
                     manager=manager,
                     conversation_id=conversation_id,
-                    user=user,
+                    user_id=user_id,
+                    email=email,
                     content=message_data.get("content", ""),
                 )
 
@@ -123,13 +128,13 @@ async def chat_websocket(
                     {
                         "type": "typing",
                         "data": {
-                            "user_id": str(user.id),
-                            "email": user.email,
+                            "user_id": str(user_id),
+                            "email": email,
                             "is_typing": message_data.get("is_typing", False),
                         },
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     },
-                    exclude_user=user.id,
+                    exclude_user=user_id,
                 )
 
             else:
@@ -142,28 +147,29 @@ async def chat_websocket(
                 )
 
     except WebSocketDisconnect:
-        await manager.disconnect(conversation_id, user.id)
+        await manager.disconnect(conversation_id, user_id)
         await manager.broadcast_to_conversation(
             conversation_id,
             {
                 "type": "user_left",
-                "data": {"user_id": str(user.id), "email": user.email},
+                "data": {"user_id": str(user_id), "email": email},
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
-        logger.info(f"User {user.id} disconnected from conversation {conversation_id}")
+        logger.info(f"User {user_id} disconnected from conversation {conversation_id}")
 
     except Exception as e:
-        logger.error(f"WebSocket error for user {user.id}: {e}")
-        await manager.disconnect(conversation_id, user.id)
+        logger.error(f"WebSocket error for user {user_id}: {e}")
+        await manager.disconnect(conversation_id, user_id)
 
 
 async def handle_chat_message(
     websocket: WebSocket,
-    session: Session,
+    sessions: SessionFactory,
     manager: ConnectionManager,
     conversation_id: uuid.UUID,
-    user,
+    user_id: uuid.UUID,
+    email: str,
     content: str,
 ):
     """
@@ -186,9 +192,10 @@ async def handle_chat_message(
         return
 
     # Check if user can send messages
-    can_send = ConversationPermissions.can_send_message(
-        session, conversation_id, user.id
-    )
+    with sessions() as s:
+        can_send = ConversationPermissions.can_send_message(
+            s, conversation_id, user_id
+        )
     if not can_send:
         await websocket.send_json(
             {
@@ -203,15 +210,18 @@ async def handle_chat_message(
         # Save user message to DB
         from app.models.chats import Message
 
-        user_message = Message(
-            conversation_id=conversation_id,
-            sender_id=user.id,
-            role="user",
-            content=content,
-        )
-        session.add(user_message)
-        session.commit()
-        session.refresh(user_message)
+        with sessions() as s:
+            user_message = Message(
+                conversation_id=conversation_id,
+                sender_id=user_id,
+                role="user",
+                content=content,
+            )
+            s.add(user_message)
+            s.commit()
+            s.refresh(user_message)
+            message_id = user_message.id
+            created_at = user_message.created_at
 
         # Broadcast user message to all participants
         await manager.broadcast_to_conversation(
@@ -219,14 +229,14 @@ async def handle_chat_message(
             {
                 "type": "message",
                 "data": {
-                    "id": str(user_message.id),
-                    "sender_id": str(user.id),
-                    "sender_email": user.email,
+                    "id": str(message_id),
+                    "sender_id": str(user_id),
+                    "sender_email": email,
                     "role": "user",
                     "content": content,
                     "suggestion": None,
                     "is_proactive": False,
-                    "created_at": user_message.created_at.isoformat(),
+                    "created_at": created_at.isoformat(),
                 },
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
@@ -243,9 +253,9 @@ async def handle_chat_message(
         suggestion_data = None
 
         async for chunk_data in ChatService.stream_chat_message_websocket(
-            session=session,
+            sessions=sessions,
             conversation_id=conversation_id,
-            user_id=user.id,
+            user_id=user_id,
             message_in=message_create,
             skip_user_message=True,  # We already saved it
         ):

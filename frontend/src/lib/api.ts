@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api/v1";
+export const API_BASE = "http://localhost:8000/api/v1";
 
 /* ── Token Management ── */
 
@@ -157,7 +157,7 @@ export async function deleteConversation(id: string) {
 
 export interface Message {
     id: string;
-    conversation_id: string;
+    sender_id: string | null;
     role: "user" | "assistant";
     content: string;
     suggestion?: {
@@ -165,6 +165,7 @@ export interface Message {
         tool_name: string;
         parameters: Record<string, unknown>;
     } | null;
+    is_proactive?: boolean;
     created_at: string;
 }
 

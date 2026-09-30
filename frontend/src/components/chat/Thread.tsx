@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AlertCircle, ArrowLeft, RotateCcw } from "lucide-react";
-import { getConversationDetail, sendMessageStream, type Message } from "../../lib/api";
+import type { Message } from "../../lib/api";
 import { readableReply } from "../../lib/reply";
 import { cn } from "../../lib/cn";
-import { freshConversations, useChatStore } from "../../stores/chatStore";
+import { useChatStore, type Peer, type Typing } from "../../stores/chatStore";
 import Cursor from "../ui/Cursor";
 import Display from "../ui/Display";
 import Composer from "./Composer";
@@ -14,64 +14,68 @@ import { AgentMessage, HumanMessage } from "./Message";
 const EASE = [0.22, 1, 0.36, 1] as const;
 /** One column for header, messages and composer: 680px of text plus gutters. */
 const MEASURE = "mx-auto w-full max-w-[728px] px-5 sm:px-6";
-const NOT_SENT = "Your message didn't send, so it's back in the box.";
-const NO_REPLY = "UNaFIED didn't reply. Send a follow-up to try again.";
+/** The server stamps no expiry on typing, so entries are dropped once this old. */
+const TYPING_TTL = 6000;
 
-type LoadState = "loading" | "ready" | "error";
+const NO_MESSAGES: Message[] = [];
+const NO_TYPING: Typing[] = [];
+const NO_PEERS: Peer[] = [];
 
 function prefersReducedMotion() {
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 export default function Thread({ conversationId }: { conversationId: string }) {
-    const syncTitle = useChatStore((s) => s.syncTitle);
-    const listTitle = useChatStore((s) => s.conversations.find((c) => c.id === conversationId)?.title);
+    const messages = useChatStore((s) => s.messages[conversationId] ?? NO_MESSAGES);
+    const load = useChatStore((s) => s.loadState[conversationId] ?? "loading");
+    const stream = useChatStore((s) => s.streaming[conversationId] ?? null);
+    const notice = useChatStore((s) => s.notice[conversationId] ?? null);
+    const typing = useChatStore((s) => s.typing[conversationId] ?? NO_TYPING);
+    const peers = useChatStore((s) => s.peers[conversationId] ?? NO_PEERS);
+    const status = useChatStore((s) => s.status[conversationId] ?? "connecting");
+    const title = useChatStore((s) => s.conversations.find((c) => c.id === conversationId)?.title);
+    const openThread = useChatStore((s) => s.openThread);
+    const closeThread = useChatStore((s) => s.closeThread);
+    const loadThread = useChatStore((s) => s.loadThread);
+    const send = useChatStore((s) => s.send);
+    const setTyping = useChatStore((s) => s.setTyping);
 
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [title, setTitle] = useState<string | null>(null);
-    const [load, setLoad] = useState<LoadState>(() => (freshConversations.has(conversationId) ? "ready" : "loading"));
-    const [attempt, setAttempt] = useState(0);
-    /** The reply in flight: null when idle, "" while the agent thinks. */
-    const [reply, setReply] = useState<string | null>(null);
-    const [replyAt, setReplyAt] = useState("");
     /** Rows at or past this index arrived during this visit and get entrances. */
     const [liveFrom, setLiveFrom] = useState(Number.POSITIVE_INFINITY);
-    const [notice, setNotice] = useState<string | null>(null);
+    const [now, setNow] = useState(() => Date.now());
 
     const rootRef = useRef<HTMLElement>(null);
     const scrollerRef = useRef<HTMLDivElement>(null);
     const composerRef = useRef<HTMLDivElement>(null);
     const pinnedRef = useRef(true);
     const landedRef = useRef(false);
-    const aliveRef = useRef(true);
+    const primedRef = useRef(false);
+    const seenRef = useRef(0);
 
     useEffect(() => {
-        aliveRef.current = true;
-        return () => {
-            aliveRef.current = false;
-        };
-    }, []);
+        openThread(conversationId);
+        return () => closeThread(conversationId);
+    }, [conversationId, openThread, closeThread]);
 
     useEffect(() => {
-        // Nothing to fetch for a conversation this session just created, and a
-        // late response would race the first message.
-        if (attempt === 0 && freshConversations.has(conversationId)) return;
-        let alive = true;
-        getConversationDetail(conversationId)
-            .then((data) => {
-                if (!alive) return;
-                setMessages(data.messages ?? []);
-                setTitle(data.title);
-                setLoad("ready");
-                syncTitle(conversationId, data.title);
-            })
-            .catch(() => {
-                if (alive) setLoad("error");
-            });
-        return () => {
-            alive = false;
-        };
-    }, [conversationId, attempt, syncTitle]);
+        if (load !== "ready") return;
+        if (!primedRef.current) {
+            primedRef.current = true;
+            seenRef.current = messages.length;
+            return;
+        }
+        if (messages.length > seenRef.current) setLiveFrom((v) => Math.min(v, seenRef.current));
+        seenRef.current = messages.length;
+    }, [load, messages.length]);
+
+    // The server never expires a typing flag, so drop entries once they age out.
+    useEffect(() => {
+        if (typing.length === 0) return;
+        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, [typing.length]);
+
+    const typingNow = typing.filter((t) => t.at > now - TYPING_TTL);
 
     // Messages scroll under the floating composer; pad the list by its height.
     useLayoutEffect(() => {
@@ -85,24 +89,26 @@ export default function Thread({ conversationId }: { conversationId: string }) {
         return () => observer.disconnect();
     }, [load]);
 
+    const thinking = stream !== null;
     const rows: Message[] =
-        reply === null
+        stream === null
             ? messages
             : [
                   ...messages,
                   {
-                      id: "reply",
-                      conversation_id: conversationId,
+                      id: "stream",
+                      sender_id: null,
                       role: "assistant",
-                      content: reply,
+                      content: readableReply(stream),
                       suggestion: null,
-                      created_at: replyAt,
+                      is_proactive: false,
+                      created_at: "",
                   },
               ];
 
     // Stay with the conversation as it grows — unless the reader scrolled up.
-    // Keyed on `messages` itself, not its length: the refetch after a reply can
-    // attach a proposal without adding a row. Scroll the one element directly;
+    // Keyed on the arrays themselves, not their length: settling a reply can attach
+    // a proposal without adding a row. Scroll the one element directly;
     // scrollIntoView would also scroll the app shell.
     useLayoutEffect(() => {
         const el = scrollerRef.current;
@@ -114,7 +120,7 @@ export default function Thread({ conversationId }: { conversationId: string }) {
         }
         if (!pinnedRef.current) return;
         el.scrollTo({ top: el.scrollHeight, behavior: prefersReducedMotion() ? "auto" : "smooth" });
-    }, [load, messages, reply]);
+    }, [load, messages, stream]);
 
     const handleScroll = () => {
         const el = scrollerRef.current;
@@ -122,100 +128,18 @@ export default function Thread({ conversationId }: { conversationId: string }) {
         pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
     };
 
-    const send = useCallback(
-        async (content: string): Promise<boolean> => {
-            if (reply !== null) return false;
+    const handleTyping = (value: boolean) => setTyping(conversationId, value);
 
-            freshConversations.delete(conversationId);
-            const base = messages.length;
-            const sentAt = new Date().toISOString();
-            pinnedRef.current = true;
-            setNotice(null);
-            setLiveFrom((v) => Math.min(v, base));
-            setMessages((m) => [
-                ...m,
-                {
-                    id: `local-${sentAt}`,
-                    conversation_id: conversationId,
-                    role: "user",
-                    content,
-                    suggestion: null,
-                    created_at: sentAt,
-                },
-            ]);
-            setReplyAt(sentAt);
-            setReply("");
+    const activity = [
+        peers.length ? `${peers.length} ${peers.length === 1 ? "other" : "others"} here` : "",
+        typingNow.length
+            ? `${typingNow.map((t) => t.email.split("@")[0]).join(", ")} ${typingNow.length === 1 ? "is" : "are"} typing…`
+            : "",
+    ]
+        .filter(Boolean)
+        .join("  ·  ");
 
-            let raw = "";
-            try {
-                await sendMessageStream(
-                    conversationId,
-                    content,
-                    (chunk) => {
-                        raw += chunk;
-                        if (aliveRef.current) setReply(readableReply(raw));
-                    },
-                    () => {},
-                );
-            } catch {
-                if (!aliveRef.current) return false;
-                setReply(null);
-                // Ask the server what it kept before deciding what to tell the person.
-                try {
-                    const fresh = await getConversationDetail(conversationId);
-                    if (!aliveRef.current) return false;
-                    const list = fresh.messages ?? [];
-                    const last = list[list.length - 1];
-                    const kept = last?.role === "user" && last.content === content;
-                    setMessages(list);
-                    setNotice(kept ? NO_REPLY : NOT_SENT);
-                    return kept;
-                } catch {
-                    if (!aliveRef.current) return false;
-                    setMessages((m) => m.slice(0, base));
-                    setNotice(NOT_SENT);
-                    return false;
-                }
-            }
-
-            if (!aliveRef.current) return true;
-
-            // Settle the streamed reply in place (same row, so it doesn't replay),
-            // then reconcile with the stored copy, which carries any proposal.
-            setMessages((m) => [
-                ...m,
-                {
-                    id: `local-reply-${sentAt}`,
-                    conversation_id: conversationId,
-                    role: "assistant",
-                    content: readableReply(raw),
-                    suggestion: null,
-                    created_at: new Date().toISOString(),
-                },
-            ]);
-            setReply(null);
-
-            try {
-                const fresh = await getConversationDetail(conversationId);
-                if (!aliveRef.current) return true;
-                setMessages(fresh.messages ?? []);
-                setTitle(fresh.title);
-                syncTitle(conversationId, fresh.title);
-            } catch {
-                // The local copy stands until the next load.
-            }
-            return true;
-        },
-        [conversationId, messages.length, reply, syncTitle],
-    );
-
-    const retry = () => {
-        setLoad("loading");
-        setAttempt((a) => a + 1);
-    };
-
-    const heading = title ?? listTitle ?? "";
-    const thinking = reply !== null;
+    const heading = title ?? "";
     const count = messages.length;
 
     return (
@@ -250,7 +174,9 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                     {load === "ready" && (
                         <p className="flex shrink-0 items-center gap-2 text-ink-3" role="status">
                             <Cursor mode={thinking ? "think" : "listen"} className="h-2.5 w-1.5 shadow-none" />
-                            <span className="eyebrow">{thinking ? "Thinking" : "Listening"}</span>
+                            <span className="eyebrow">
+                                {status === "online" ? (thinking ? "Thinking" : "Listening") : status === "connecting" ? "Connecting" : "Offline"}
+                            </span>
                         </p>
                     )}
                 </div>
@@ -286,7 +212,7 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                             <p className="mt-2 text-body text-ink-3">
                                 Try again, or open another conversation from the list.
                             </p>
-                            <button type="button" className="btn btn-ghost mt-5" onClick={retry}>
+                            <button type="button" className="btn btn-ghost mt-5" onClick={() => void loadThread(conversationId)}>
                                 <RotateCcw size={15} aria-hidden="true" />
                                 Try again
                             </button>
@@ -336,6 +262,17 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                         </motion.div>
                     )}
 
+                    {activity && (
+                        <p
+                            className="mt-4 flex items-center gap-2 self-start font-mono text-micro text-ink-4"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <Cursor mode="listen" className="h-2 w-1 shadow-none" />
+                            {activity}
+                        </p>
+                    )}
+
                     {notice && (
                         <motion.p
                             role="alert"
@@ -359,7 +296,7 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
                 >
-                    <Composer onSend={send} busy={thinking} />
+                    <Composer onSend={(content) => send(conversationId, content)} onTyping={handleTyping} busy={thinking} />
                 </motion.div>
             )}
         </motion.section>

@@ -10,9 +10,10 @@ interface Props {
     onSend: (text: string) => Promise<boolean>;
     /** A reply is in flight: typing is fine, sending waits. */
     busy: boolean;
+    onTyping?: (isTyping: boolean) => void;
 }
 
-export default function Composer({ onSend, busy }: Props) {
+export default function Composer({ onSend, busy, onTyping }: Props) {
     const [value, setValue] = useState("");
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const armed = value.trim().length > 0 && !busy;
@@ -74,7 +75,11 @@ export default function Composer({ onSend, busy }: Props) {
                     ref={inputRef}
                     rows={1}
                     value={value}
-                    onChange={(e) => setValue(e.target.value)}
+                    onChange={(e) => {
+                        setValue(e.target.value);
+                        onTyping?.(e.target.value.trim().length > 0);
+                    }}
+                    onBlur={() => onTyping?.(false)}
                     onKeyDown={handleKeyDown}
                     placeholder="Write a message…"
                     maxLength={4000}

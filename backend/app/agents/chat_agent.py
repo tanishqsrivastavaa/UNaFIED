@@ -19,7 +19,9 @@ class SuggestedAction(BaseModel):
 
 
 class AgentResponse(BaseModel):
-    chat_message: str = Field(description="The natural language reply to the user's input.")
+    chat_message: str = Field(
+        description="The natural language reply to the user's input."
+    )
     suggestion: Optional[SuggestedAction] = Field(
         default=None,
         description="Optional. Only provide this if you are proposing a concrete action for the user to approve.",
@@ -28,10 +30,11 @@ class AgentResponse(BaseModel):
 
 chat_agent = Agent(
     GroqModel(
-        model_name="llama-3.3-70b-versatile",
+        model_name="openai/gpt-oss-120b",
         provider=GroqProvider(api_key=GROQ_API_KEY),
     ),
     system_prompt=prompt,
     output_type=str,
     deps_type=str,
 )
+
