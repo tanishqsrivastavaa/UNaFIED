@@ -78,18 +78,19 @@ async def chat_websocket(
             return
 
     # Connect
-    await manager.connect(websocket, conversation_id, user_id)
+    first = await manager.connect(websocket, conversation_id, user_id)
 
-    # Notify others that user joined
-    await manager.broadcast_to_conversation(
-        conversation_id,
-        {
-            "type": "user_joined",
-            "data": {"user_id": str(user_id), "email": email},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        },
-        exclude_user=user_id,  # Don't send to the user who just joined
-    )
+    # Notify others that user joined; a second tab or a reconnect isn't a new arrival
+    if first:
+        await manager.broadcast_to_conversation(
+            conversation_id,
+            {
+                "type": "user_joined",
+                "data": {"user_id": str(user_id), "email": email},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            exclude_user=user_id,  # Don't send to the user who just joined
+        )
 
     try:
         while True:
@@ -147,20 +148,22 @@ async def chat_websocket(
                 )
 
     except WebSocketDisconnect:
-        await manager.disconnect(conversation_id, user_id)
-        await manager.broadcast_to_conversation(
-            conversation_id,
-            {
-                "type": "user_left",
-                "data": {"user_id": str(user_id), "email": email},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
-        )
+        last = await manager.disconnect(conversation_id, user_id, websocket)
+        # Only announce a departure when this was the user's last open socket
+        if last:
+            await manager.broadcast_to_conversation(
+                conversation_id,
+                {
+                    "type": "user_left",
+                    "data": {"user_id": str(user_id), "email": email},
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
         logger.info(f"User {user_id} disconnected from conversation {conversation_id}")
 
     except Exception as e:
         logger.error(f"WebSocket error for user {user_id}: {e}")
-        await manager.disconnect(conversation_id, user_id)
+        await manager.disconnect(conversation_id, user_id, websocket)
 
 
 async def handle_chat_message(
@@ -193,8 +196,9 @@ async def handle_chat_message(
 
     # Check if user can send messages
     with sessions() as s:
-        can_send = ConversationPermissions.can_send_message(
-            s, conversation_id, user_id
+        can_send = ConversationPermissions.can_send_message(s, conversation_id, user_id)
+        assistant_replies = ChatService.assistant_should_reply(
+            s, conversation_id, content
         )
     if not can_send:
         await websocket.send_json(
@@ -238,6 +242,18 @@ async def handle_chat_message(
                     "is_proactive": False,
                     "created_at": created_at.isoformat(),
                 },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+        if not assistant_replies:
+            return
+
+        await manager.broadcast_to_conversation(
+            conversation_id,
+            {
+                "type": "stream_start",
+                "data": {"role": "assistant"},
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )

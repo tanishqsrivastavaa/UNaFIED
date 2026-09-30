@@ -3,7 +3,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 import { MotionConfig } from "framer-motion";
 import { useAuthStore } from "./stores/authStore";
 import Backdrop from "./components/ui/Backdrop";
-import Cursor from "./components/ui/Cursor";
+import Presence from "./components/ui/Presence";
 import AuthShell from "./components/auth/AuthShell";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
@@ -24,8 +24,8 @@ function Splash() {
     return (
         <div className="grid min-h-dvh place-items-center" role="status">
             <span className="sr-only">Restoring your session</span>
-            <span style={{ animation: "rise-in 600ms var(--ease-out) 400ms both" }}>
-                <Cursor mode="think" className="h-6 w-3.5" />
+            <span style={{ animation: "rise-in 400ms var(--ease-out) 400ms both" }}>
+                <Presence mode="think" className="size-2" />
             </span>
         </div>
     );

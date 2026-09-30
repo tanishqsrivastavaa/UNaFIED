@@ -4,9 +4,11 @@ import {
     deleteConversation,
     getConversationDetail,
     getConversations,
+    inviteParticipant,
     sendMessageStream,
     type Conversation,
     type Message,
+    type Participant,
 } from "../lib/api";
 import { readableReply } from "../lib/reply";
 import {
@@ -58,6 +60,8 @@ interface ChatState {
     notice: Record<string, string | null>;
     typing: Record<string, Typing[]>;
     peers: Record<string, Peer[]>;
+    /** Everyone ever added to the conversation; `is_active` is false for people who left. */
+    participants: Record<string, Participant[]>;
     status: Record<string, SocketStatus>;
     typingSent: Record<string, boolean>;
     pending: Record<string, Pending | null>;
@@ -75,7 +79,14 @@ interface ChatState {
     loadThread: (id: string) => Promise<void>;
     send: (id: string, content: string) => Promise<boolean>;
     setTyping: (id: string, isTyping: boolean) => void;
+    /** Adds someone by email. Throws with the server's reason on failure. */
+    invite: (id: string, email: string) => Promise<void>;
     reset: () => void;
+}
+
+/** Adds or re-activates one person without duplicating them. */
+function withMember(list: Participant[] = [], member: Participant): Participant[] {
+    return [...list.filter((p) => p.user_id !== member.user_id), member];
 }
 
 function assistantRow(content: string, suggestion: Message["suggestion"]): Message {
@@ -93,7 +104,10 @@ function assistantRow(content: string, suggestion: Message["suggestion"]): Messa
 export const useChatStore = create<ChatState>((set, get) => {
     const refresh = async (id: string) => {
         const data = await getConversationDetail(id);
-        set((s) => ({ messages: { ...s.messages, [id]: data.messages ?? [] } }));
+        set((s) => ({
+            messages: { ...s.messages, [id]: data.messages ?? [] },
+            participants: { ...s.participants, [id]: data.participants ?? [] },
+        }));
         get().syncTitle(id, data.title);
     };
 
@@ -133,6 +147,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     /** The no-socket path: the HTTP stream the app used before sockets existed. */
     const sendOverHttp = async (id: string, content: string, pending: Pending) => {
         let raw = "";
+        set((s) => ({ streaming: { ...s.streaming, [id]: "" } }));
         try {
             await sendMessageStream(
                 id,
@@ -149,7 +164,10 @@ export const useChatStore = create<ChatState>((set, get) => {
         }
 
         set((s) => ({
-            messages: { ...s.messages, [id]: [...(s.messages[id] ?? []), assistantRow(readableReply(raw), null)] },
+            // A shared conversation streams nothing back unless someone mentions the assistant
+            messages: raw
+                ? { ...s.messages, [id]: [...(s.messages[id] ?? []), assistantRow(readableReply(raw), null)] }
+                : s.messages,
             streaming: { ...s.streaming, [id]: null },
             pending: { ...s.pending, [id]: null },
         }));
@@ -162,11 +180,14 @@ export const useChatStore = create<ChatState>((set, get) => {
             case "message": {
                 const message = event.data as unknown as Message;
                 const me = useAuthStore.getState().user?.id;
+                const pending = get().pending[id];
+                let settled = false;
                 set((s) => {
                     const list = s.messages[id] ?? [];
                     if (list.some((m) => m.id === message.id)) return s;
-                    const pending = s.pending[id];
-                    const mine = pending && message.sender_id === me && message.content === pending.content;
+                    const mine =
+                        pending && s.pending[id] === pending && message.sender_id === me && message.content === pending.content;
+                    settled = !!mine;
                     return {
                         ...s,
                         messages: {
@@ -178,6 +199,13 @@ export const useChatStore = create<ChatState>((set, get) => {
                         pending: mine ? { ...s.pending, [id]: null } : s.pending,
                     };
                 });
+                // The server has the message, so the send is done; a reply, if any, arrives separately
+                if (settled && pending) pending.resolve(true);
+                break;
+            }
+
+            case "stream_start": {
+                set((s) => ({ ...s, streaming: { ...s.streaming, [id]: "" } }));
                 break;
             }
 
@@ -244,6 +272,15 @@ export const useChatStore = create<ChatState>((set, get) => {
                 break;
             }
 
+            case "participant_added": {
+                const { user_id, email } = event.data as { user_id: string; email: string };
+                set((s) => ({
+                    ...s,
+                    participants: { ...s.participants, [id]: withMember(s.participants[id], { user_id, email, is_active: true }) },
+                }));
+                break;
+            }
+
             case "error": {
                 const { message } = event.data as { message?: string };
                 const pending = get().pending[id];
@@ -280,6 +317,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         notice: {},
         typing: {},
         peers: {},
+        participants: {},
         status: {},
         typingSent: {},
         pending: {},
@@ -383,7 +421,6 @@ export const useChatStore = create<ChatState>((set, get) => {
                             },
                         ],
                     },
-                    streaming: { ...s.streaming, [id]: "" },
                     notice: { ...s.notice, [id]: null },
                     pending: { ...s.pending, [id]: pending },
                 }));
@@ -399,6 +436,11 @@ export const useChatStore = create<ChatState>((set, get) => {
             wsSend(id, "typing", { is_typing: isTyping });
         },
 
+        invite: async (id, email) => {
+            const added = await inviteParticipant(id, email);
+            set((s) => ({ participants: { ...s.participants, [id]: withMember(s.participants[id], added) } }));
+        },
+
         reset: () => {
             closeAllSockets();
             active.clear();
@@ -412,6 +454,7 @@ export const useChatStore = create<ChatState>((set, get) => {
                 notice: {},
                 typing: {},
                 peers: {},
+                participants: {},
                 status: {},
                 typingSent: {},
                 pending: {},

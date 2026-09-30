@@ -1,4 +1,8 @@
 import uuid, json
+import re
+from datetime import datetime
+from ..models.user import User
+from ..schemas.participants import ParticipantRead
 from typing import List, Sequence, AsyncGenerator
 from sqlmodel import Session, select, desc, asc, func
 from ..models.chats import (
@@ -22,6 +26,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 
 SessionFactory = Callable[[], AbstractContextManager[Session]]
+ASSISTANT_MENTION = re.compile(r"(?<![\w.])@unafied\b", re.IGNORECASE)
 
 
 class ChatService:
@@ -468,9 +473,7 @@ class ChatService:
         if user_message_id is not None and query_vector:
             with sessions() as session:
                 session.add(
-                    MessageEmbedding(
-                        message_id=user_message_id, embedding=query_vector
-                    )
+                    MessageEmbedding(message_id=user_message_id, embedding=query_vector)
                 )
                 session.commit()
 
@@ -526,6 +529,106 @@ class ChatService:
         if ai_vector:
             with sessions() as session:
                 session.add(
-                    MessageEmbedding(message_id=assistant_message_id, embedding=ai_vector)
+                    MessageEmbedding(
+                        message_id=assistant_message_id, embedding=ai_vector
+                    )
                 )
                 session.commit()
+
+    @staticmethod
+    def add_participant(
+        session: Session, conversation_id: uuid.UUID, inviter_id: uuid.UUID, email: str
+    ) -> ParticipantRead:
+        """Add a user to a conversation by email; re-adds them if they had left"""
+        from ..services.permissions import ConversationPermissions
+
+        # A cached current_user carries its id as text, so normalise before comparing
+        inviter_id = uuid.UUID(str(inviter_id))
+
+        if not ConversationPermissions.can_invite(session, conversation_id, inviter_id):
+            raise PermissionError("Only people in this conversation can add others")
+
+        invitee = session.exec(
+            select(User).where(func.lower(User.email) == email.strip().lower())
+        ).first()
+        if not invitee:
+            raise LookupError("No account uses that email")
+        if invitee.id == inviter_id:
+            raise ValueError("You are already in this conversation")
+
+        participant = session.exec(
+            select(ConversationParticipant).where(
+                ConversationParticipant.conversation_id == conversation_id,
+                ConversationParticipant.user_id == invitee.id,
+            )
+        ).first()
+        if participant and participant.is_active:
+            raise ValueError(f"{invitee.email} is already in this conversation")
+
+        if participant:
+            participant.is_active = True
+            participant.left_at = None
+            participant.joined_at = datetime.now()
+        else:
+            participant = ConversationParticipant(
+                conversation_id=conversation_id, user_id=invitee.id, role="member"
+            )
+        session.add(participant)
+
+        # Moves the conversation to the top of everyone's list
+        conversation = session.get(Conversation, conversation_id)
+        conversation.updated_at = datetime.now()
+        session.add(conversation)
+
+        session.commit()
+        session.refresh(participant)
+        return ParticipantRead(**participant.model_dump(), email=invitee.email)
+
+    @staticmethod
+    def get_conversation_detail(
+        session: Session, user_id: uuid.UUID, conversation_id: uuid.UUID
+    ) -> dict | None:
+        """Conversation with its messages in time order, each carrying its sender's email, plus its participants"""
+        conversation = ChatService.get_conversation(session, user_id, conversation_id)
+        if not conversation:
+            return None
+
+        message_rows = session.exec(
+            select(Message, User.email)
+            .outerjoin(User, Message.sender_id == User.id)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(asc(Message.created_at))
+        ).all()
+
+        participant_rows = session.exec(
+            select(ConversationParticipant, User.email)
+            .join(User, ConversationParticipant.user_id == User.id)
+            .where(ConversationParticipant.conversation_id == conversation_id)
+            .order_by(asc(ConversationParticipant.joined_at))
+        ).all()
+
+        participants = [
+            {**p.model_dump(), "email": email} for p, email in participant_rows
+        ]
+        return {
+            **conversation.model_dump(),
+            "participant_count": sum(1 for p in participants if p["is_active"]),
+            "messages": [
+                {**m.model_dump(), "sender_email": email} for m, email in message_rows
+            ],
+            "participants": participants,
+        }
+
+    @staticmethod
+    def assistant_should_reply(
+        session: Session, conversation_id: uuid.UUID, content: str
+    ) -> bool:
+        active = session.exec(
+            select(func.count())
+            .select_from(ConversationParticipant)
+            .where(
+                ConversationParticipant.conversation_id == conversation_id,
+                ConversationParticipant.is_active == True,
+            )
+        ).one()
+        return active < 2 or bool(ASSISTANT_MENTION.search(content))

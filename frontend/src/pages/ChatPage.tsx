@@ -41,12 +41,12 @@ export default function ChatPage() {
     }, [startNew]);
 
     return (
-        <div className="flex h-dvh w-full gap-3 p-2 sm:p-3">
+        <div className="flex h-dvh w-full">
             <Rail
                 onNew={() => void startNew()}
                 creating={creating}
                 createError={createError}
-                className={cn("w-full md:w-[296px] md:shrink-0", conversationId && "max-md:hidden")}
+                className={cn("w-full md:w-[272px] md:shrink-0", conversationId && "max-md:hidden")}
             />
             <main className={cn("relative min-w-0 flex-1", !conversationId && "max-md:hidden")}>
                 <AnimatePresence initial={false}>

@@ -158,6 +158,8 @@ export async function deleteConversation(id: string) {
 export interface Message {
     id: string;
     sender_id: string | null;
+    /** Null for the assistant. */
+    sender_email?: string | null;
     role: "user" | "assistant";
     content: string;
     suggestion?: {
@@ -170,7 +172,23 @@ export interface Message {
 }
 
 export async function getConversationDetail(id: string) {
-    return apiFetch<Conversation & { messages: Message[] }>(`/chats/${id}`);
+    return apiFetch<Conversation & { messages: Message[]; participants: Participant[] }>(`/chats/${id}`);
+}
+
+/* ── Participants ── */
+
+export interface Participant {
+    user_id: string;
+    email: string;
+    is_active: boolean;
+}
+
+/** Adds someone by email. Throws with the server's reason: no such account, or already here. */
+export async function inviteParticipant(conversationId: string, email: string) {
+    return apiFetch<Participant>(`/chats/${conversationId}/participants`, {
+        method: "POST",
+        body: JSON.stringify({ email }),
+    });
 }
 
 export async function sendMessageStream(

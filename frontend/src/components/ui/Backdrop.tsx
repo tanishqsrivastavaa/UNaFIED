@@ -1,48 +1,37 @@
+const GRAIN =
+    "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")";
+
+/* Many stops approximate a gaussian falloff, so the light has no visible edge. */
+const GLOW =
+    "radial-gradient(closest-side, rgb(124 140 106 / 0.34) 0%, rgb(124 140 106 / 0.26) 16%, rgb(124 140 106 / 0.16) 34%, rgb(124 140 106 / 0.08) 52%, rgb(124 140 106 / 0.03) 72%, rgb(124 140 106 / 0.008) 88%, transparent 100%)";
+
+/* The halftone only shows where the light is. */
+const SCREEN_MASK = "radial-gradient(60vmax 44vmax at 16% 104%, #000 0%, rgb(0 0 0 / 0.5) 38%, transparent 100%)";
+
 /**
- * The dusk behind everything. Glass is only glass if there is light behind it
- * to blur, so this is structural, not decoration. Three soft glows drift on
- * long, out-of-step cycles so the room never visibly loops.
+ * The room behind everything: near-black, with one dim sage light rising from
+ * the lower left, a fine halftone screen inside it, and grain over all of it.
+ * The light drifts on a 90s cycle, too slowly to notice while reading.
  */
 export default function Backdrop() {
     return (
-        <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-dusk">
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-void">
             <div
                 data-drift
-                className="absolute -left-[22vmax] -top-[26vmax] size-[82vmax] rounded-full"
-                style={{
-                    background: "radial-gradient(closest-side, rgb(74 31 54 / 0.95) 0%, rgb(58 26 44 / 0.8) 22%, rgb(43 21 34 / 0.55) 45%, rgb(43 21 34 / 0.25) 68%, rgb(43 21 34 / 0.08) 85%, transparent 100%)",
-                    animation: "drift-a 64s var(--ease-in-out) infinite alternate",
-                }}
+                className="absolute bottom-[-54vmax] left-[calc(16%-48vmax)] size-[96vmax] rounded-full"
+                style={{ background: GLOW, animation: "drift 90s var(--ease-in-out) infinite alternate" }}
             />
-            <div
-                data-drift
-                className="absolute -bottom-[30vmax] -right-[20vmax] size-[78vmax] rounded-full"
-                style={{
-                    background: "radial-gradient(closest-side, rgb(78 45 16 / 0.9) 0%, rgb(60 36 15 / 0.75) 22%, rgb(42 26 15 / 0.5) 45%, rgb(42 26 15 / 0.22) 68%, rgb(42 26 15 / 0.07) 85%, transparent 100%)",
-                    animation: "drift-b 78s var(--ease-in-out) infinite alternate",
-                }}
-            />
-            <div
-                data-drift
-                className="absolute bottom-[-18vmax] left-[30%] size-[46vmax] rounded-full opacity-70"
-                style={{
-                    background: "radial-gradient(closest-side, rgb(242 195 188 / 0.1), rgb(242 195 188 / 0.05) 45%, rgb(242 195 188 / 0.015) 75%, transparent 100%)",
-                    animation: "drift-c 52s var(--ease-in-out) infinite alternate",
-                }}
-            />
-            {/* vignette keeps the eye in the middle */}
             <div
                 className="absolute inset-0"
-                style={{ background: "radial-gradient(120% 90% at 50% 45%, transparent 55%, rgb(0 0 0 / 0.55) 100%)" }}
-            />
-            {/* grain stops the dark gradients from banding */}
-            <div
-                className="absolute inset-0 opacity-[0.07] mix-blend-soft-light"
                 style={{
-                    backgroundImage:
-                        "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
+                    backgroundImage: "radial-gradient(rgb(236 235 231 / 0.1) 0.9px, transparent 1.3px)",
+                    backgroundSize: "5px 5px",
+                    maskImage: SCREEN_MASK,
+                    WebkitMaskImage: SCREEN_MASK,
                 }}
             />
+            {/* grain stops the dark gradient from banding */}
+            <div className="absolute inset-0 opacity-[0.06] mix-blend-soft-light" style={{ backgroundImage: GRAIN }} />
         </div>
     );
 }

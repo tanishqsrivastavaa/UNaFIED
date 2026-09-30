@@ -7,7 +7,7 @@ export function EmailField({ id, label, hint, ...rest }: InputProps & { id: stri
     const hintId = hint ? `${id}-hint` : undefined;
     return (
         <div>
-            <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink-2">
+            <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink-3">
                 {label}
             </label>
             <input id={id} type="email" className="field" aria-describedby={hintId} {...rest} />
@@ -33,7 +33,7 @@ export function PasswordField({
 
     return (
         <div>
-            <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink-2">
+            <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink-3">
                 {label}
             </label>
             <div className="relative">
@@ -68,7 +68,7 @@ export function FormError({ id, message }: { id: string; message: string }) {
         <p
             id={id}
             role="alert"
-            className="flex items-start gap-2.5 rounded-md border border-line-2 bg-veil-1 px-3.5 py-3 text-sm text-ink-2"
+            className="flex items-start gap-2.5 rounded-md bg-fill-2 px-3.5 py-3 text-sm text-ink-2"
         >
             <AlertCircle size={16} className="mt-0.5 shrink-0 text-ink-3" aria-hidden="true" />
             <span>{message}</span>
