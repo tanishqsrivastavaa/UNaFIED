@@ -20,6 +20,7 @@ import {
     type SocketStatus,
 } from "../lib/ws";
 import { useAuthStore } from "./authStore";
+import { useReminderStore } from "./reminderStore";
 
 type ListState = "loading" | "ready" | "error";
 export type LoadState = "loading" | "ready" | "error";
@@ -293,6 +294,11 @@ export const useChatStore = create<ChatState>((set, get) => {
                         notice: { ...s.notice, [id]: message ?? null },
                     }));
                 }
+                break;
+            }
+
+            case "reminders_changed": {
+                void useReminderStore.getState().load();
                 break;
             }
 
