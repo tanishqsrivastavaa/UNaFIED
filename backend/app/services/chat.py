@@ -1,6 +1,6 @@
 import uuid, json
 import re
-from datetime import datetime
+from ..core.clock import utcnow
 from ..models.user import User
 from ..schemas.participants import ParticipantRead
 from typing import List, Sequence, AsyncGenerator
@@ -568,7 +568,7 @@ class ChatService:
         if participant:
             participant.is_active = True
             participant.left_at = None
-            participant.joined_at = datetime.now()
+            participant.joined_at = utcnow()
         else:
             participant = ConversationParticipant(
                 conversation_id=conversation_id, user_id=invitee.id, role="member"
@@ -577,7 +577,7 @@ class ChatService:
 
         # Moves the conversation to the top of everyone's list
         conversation = session.get(Conversation, conversation_id)
-        conversation.updated_at = datetime.now()
+        conversation.updated_at = utcnow()
         session.add(conversation)
 
         session.commit()
