@@ -18,6 +18,7 @@ from app.api.websockets.manager import get_connection_manager, ConnectionManager
 from app.api.websockets.auth import authenticate_ws_token
 from app.services.permissions import ConversationPermissions
 from app.services.chat import ChatService, SessionFactory
+from app.services import listener
 from app.schemas.chat import MessageCreate
 from app.core.logger import logger
 
@@ -245,6 +246,7 @@ async def handle_chat_message(
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
+        listener.watch(conversation_id, message_id)
 
         if not assistant_replies:
             return

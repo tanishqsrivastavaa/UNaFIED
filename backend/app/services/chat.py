@@ -14,6 +14,7 @@ from ..models.chats import (
 from ..schemas.chat import ConversationCreate, MessageCreate
 from ..agents.chat_agent import chat_agent
 from ..services.embeddings import generate_embedding
+from ..services import listener
 from pydantic_ai import (
     ModelMessage,
     ModelResponse,
@@ -207,6 +208,7 @@ class ChatService:
         session.add(user_message)
         session.commit()
         session.refresh(user_message)
+        listener.watch(conversation_id, user_message.id)
 
         # Generate embedding
         user_vector = await generate_embedding(message_in.content)
@@ -339,6 +341,7 @@ class ChatService:
         session.add(user_message)
         session.commit()
         session.refresh(user_message)
+        listener.watch(conversation_id, user_message.id)
 
         # Generate embedding
         user_vector = await generate_embedding(message_in.content)
