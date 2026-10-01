@@ -12,6 +12,20 @@ export function clock(value: string): string {
     return serverDate(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+/** A moment ahead, the way people say it: "Today 4:00 PM", "Tomorrow 9:00 AM", "Fri 2 Oct, 4:00 PM". */
+export function when(value: string, now: number): string {
+    const at = serverDate(value);
+    const time = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const days = Math.round((startOfDay(at) - startOfDay(new Date(now))) / 86_400_000);
+    if (days === 0) return `Today ${time}`;
+    if (days === 1) return `Tomorrow ${time}`;
+    return `${at.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })}, ${time}`;
+}
+
+function startOfDay(at: Date): number {
+    return new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
+}
+
 export function ago(value: string, now: number): string {
     const mins = Math.floor((now - serverDate(value).getTime()) / 60000);
     if (mins < 1) return "now";
