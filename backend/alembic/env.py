@@ -19,6 +19,7 @@ from app.models.chats import (
     UploadedFile,
     FileEmbedding,
 )
+from app.models.reminder import Reminder
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
