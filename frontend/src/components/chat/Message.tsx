@@ -4,7 +4,7 @@ import { cn } from "../../lib/cn";
 import { clock } from "../../lib/time";
 import Materialize from "../ui/Materialize";
 import Presence from "../ui/Presence";
-import Ticket from "./Ticket";
+import ReminderCard from "./ReminderCard";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -108,7 +108,7 @@ export function AgentMessage({ message, live, showName, phase }: AgentProps) {
                 )}
             </p>
 
-            {settled && message.suggestion && <Ticket suggestion={message.suggestion} />}
+            {settled && message.suggestion?.tool_name === "reminder" && <ReminderCard suggestion={message.suggestion} />}
         </motion.article>
     );
 }
