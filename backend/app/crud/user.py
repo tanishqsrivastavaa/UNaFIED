@@ -78,7 +78,7 @@ async def rotate_refresh_token(
         return None
     if db_token.is_revoked:
         return None
-    if db_token.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+    if db_token.expires_at < datetime.now(timezone.utc):
         return None
 
     # Revoke old token
