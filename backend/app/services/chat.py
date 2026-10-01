@@ -352,6 +352,10 @@ class ChatService:
             )
             session.commit()
 
+        # Shared chats only get a reply when someone mentions @unafied
+        if not ChatService.assistant_should_reply(session, conversation_id, message_in.content):
+            return
+
         # RAG and history
         rag_context = await ChatService.search_relevant_context(
             session, message_in.content, conversation_id, user_id
