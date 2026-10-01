@@ -124,7 +124,13 @@ export async function logout() {
 }
 
 export async function getMe() {
-    return apiFetch<{ id: string; email: string }>("/me");
+    const me = await apiFetch<{ id: string; email: string; timezone: string }>("/me");
+    // Keep the server's copy of the browser's zone current; the Listener reads it to place "4 pm today".
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (zone && me.timezone !== zone) {
+        apiFetch<void>("/me", { method: "PATCH", body: JSON.stringify({ timezone: zone }) }).catch(() => { });
+    }
+    return me;
 }
 
 /* ── Conversations ── */
