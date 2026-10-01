@@ -1,6 +1,7 @@
 """
-Runs the Listener after each human message, off the reply path, and applies its
-decision to the reminder table.
+Runs the Listener after each human message, off the reply path, applies its
+decision to the reminder table, and posts a "Reminder set" message once a plan
+is agreed.
 
 A plan is the set of reminder rows (one per person in the chat) that share the
 message which last proposed it. It starts as "proposed" and becomes "confirmed"
@@ -14,6 +15,7 @@ from datetime import datetime, timezone, tzinfo
 from zoneinfo import ZoneInfo
 from sqlmodel import select, desc
 from ..agents.listener_agent import Line, Plan, decide
+from ..api.websockets.manager import get_connection_manager
 from ..core.clock import utcnow
 from ..core.logger import logger
 from ..db.db import SessionLocal
@@ -113,6 +115,7 @@ async def listen(conversation_id: uuid.UUID, message_id: uuid.UUID, sessions=Ses
     logger.info(f"Listener: {decision.action} (plan {decision.plan}) on message {message_id}")
 
     due = _utc(decision.when, zone)
+    ack = None
     with sessions() as s:
         if decision.action == "propose":
             if due is None or due <= now or due in dues:
@@ -135,7 +138,10 @@ async def listen(conversation_id: uuid.UUID, message_id: uuid.UUID, sessions=Ses
             if decision.action == "change" and not ((due and due > now) or decision.title):
                 return  # nothing concrete changed
 
-            for r in s.exec(select(Reminder).where(Reminder.message_id == key, Reminder.status.in_(OPEN))).all():
+            rows = s.exec(select(Reminder).where(Reminder.message_id == key, Reminder.status.in_(OPEN))).all()
+            if decision.action == "agree" and not any(r.status == "proposed" for r in rows):
+                return  # already agreed; "see you then!" again changes nothing
+            for r in rows:
                 if decision.action == "agree":
                     r.status = "confirmed"
                 elif decision.action == "cancel":
@@ -149,4 +155,39 @@ async def listen(conversation_id: uuid.UUID, message_id: uuid.UUID, sessions=Ses
                     r.message_id = message_id
                 r.updated_at = utcnow()
                 s.add(r)
+
+            if decision.action == "agree" and rows:
+                # The card finds each reader's own reminder by the plan's message.
+                ack = Message(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content="Reminder set for everyone in this chat.",
+                    is_proactive=True,
+                    suggestion={
+                        "label": rows[0].title,
+                        "tool_name": "reminder",
+                        "parameters": {"plan": str(key), "due_at": _local(rows[0].due_at, timezone.utc).isoformat()},
+                    },
+                )
+                s.add(ack)
+        else:
+            return
         s.commit()
+        if ack:
+            s.refresh(ack)
+            ack = {
+                "id": str(ack.id),
+                "sender_id": None,
+                "sender_email": None,
+                "role": "assistant",
+                "content": ack.content,
+                "suggestion": ack.suggestion,
+                "is_proactive": True,
+                "created_at": _local(ack.created_at, timezone.utc).isoformat(),
+            }
+
+    manager = get_connection_manager()
+    stamp = utcnow().isoformat()
+    if ack:
+        await manager.broadcast_to_conversation(conversation_id, {"type": "message", "data": ack, "timestamp": stamp})
+    await manager.broadcast_to_conversation(conversation_id, {"type": "reminders_changed", "data": {}, "timestamp": stamp})
