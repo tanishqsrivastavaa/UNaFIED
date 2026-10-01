@@ -244,6 +244,31 @@ export async function sendMessageStream(
     onDone();
 }
 
+/* ── Reminders ── */
+
+export interface Reminder {
+    id: string;
+    conversation_id: string | null;
+    /** The message that last proposed the plan; the "Reminder set" card points at it. */
+    message_id: string | null;
+    title: string;
+    due_at: string;
+    /** proposed: waiting for the other person. confirmed: will alert. */
+    status: "proposed" | "confirmed" | "sent" | "dismissed";
+    created_at: string;
+}
+
+export async function getReminders() {
+    return apiFetch<Reminder[]>("/reminders/");
+}
+
+export async function updateReminder(id: string, changes: { status?: "confirmed" | "dismissed" }) {
+    return apiFetch<Reminder>(`/reminders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(changes),
+    });
+}
+
 /* ── Tools ── */
 
 export async function executeTool(toolName: string, parameters: Record<string, unknown>) {
