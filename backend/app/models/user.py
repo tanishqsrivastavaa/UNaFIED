@@ -11,6 +11,8 @@ class User(SQLModel, table=True):
     hashed_password: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     auth_provider: str | None = Field(default=None)
+    # IANA name such as "Asia/Kolkata", set from the browser on sign-in.
+    timezone: str = Field(default="UTC")
 
 
 class UserPreferences(SQLModel, table=True):
