@@ -3,6 +3,7 @@ from pgvector.sqlalchemy import Vector
 import uuid
 from datetime import datetime
 from typing import List, Optional
+from ..core.clock import utcnow, UTCDateTime
 
 
 class Conversation(SQLModel, table=True):
@@ -10,8 +11,8 @@ class Conversation(SQLModel, table=True):
     owner_id: uuid.UUID = Field(foreign_key="user.id", index=True)
     title: str = Field(default="New Chat")
     is_public: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
     messages: List["Message"] = Relationship(
         back_populates="conversation", cascade_delete=True, passive_deletes=True
@@ -34,7 +35,7 @@ class Message(SQLModel, table=True):
     suggestion: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     token_count: Optional[int] = None
     is_proactive: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
     conversation: Optional["Conversation"] = Relationship(back_populates="messages")
     embedding: Optional["MessageEmbedding"] = Relationship(
@@ -57,8 +58,8 @@ class ConversationParticipant(SQLModel, table=True):
     )
     user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
     role: str = Field(default="member")  # "owner" or "member"
-    joined_at: datetime = Field(default_factory=datetime.now)
-    left_at: Optional[datetime] = None
+    joined_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    left_at: Optional[datetime] = Field(default=None, sa_type=UTCDateTime)
     is_active: bool = Field(default=True)
 
     conversation: Optional["Conversation"] = Relationship(back_populates="participants")
@@ -81,7 +82,7 @@ class UploadedFile(SQLModel, table=True):
 
     extracted_text: Optional[str] = None
 
-    uploaded_at: datetime = Field(default_factory=datetime.now)
+    uploaded_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
     embedding: Optional["FileEmbedding"] = Relationship(
         sa_relationship_kwargs={"uselist": False}
