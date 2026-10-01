@@ -6,7 +6,7 @@ from ...core.redis import get_redis
 from ...core.security import get_current_user
 from ...db.db import get_session
 from ...models.user import User
-from ...schemas.user import LoginRequest, UserCreate
+from ...schemas.user import LoginRequest, UserCreate, UserRead
 from ...crud.user import (
     create_user,
     authenticate_user,
@@ -17,7 +17,7 @@ from ...crud.user import (
 router = APIRouter(tags=["users"])
 
 
-@router.post("/signup", response_model=User)
+@router.post("/signup", response_model=UserRead)
 async def signup(user_data: UserCreate, session: Session = Depends(get_session)):
     new_user = await create_user(user_data, session)
     if not new_user:
@@ -56,7 +56,7 @@ async def logout(body: RefreshRequest, session: Session = Depends(get_session)):
     # Always 204 regardless — don't leak whether token existed
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserRead)
 async def read_users_me(
     current_user: User = Depends(get_current_user),
     redis = Depends(get_redis)):

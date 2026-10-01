@@ -1,3 +1,4 @@
+import uuid
 from sqlmodel import SQLModel
 from pydantic import BaseModel
 
@@ -14,3 +15,8 @@ class LoginRequest(BaseModel):
     password: str
 
 
+#What the API shows about a user; never the password hash
+class UserRead(BaseModel):
+    id: uuid.UUID
+    email: str
+    timezone: str
