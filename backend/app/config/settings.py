@@ -2,7 +2,8 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=".env", override=True)
+# Real environment variables win, so Docker can point at its own database and Redis.
+load_dotenv(dotenv_path=".env", override=False)
 
 
 class Settings(BaseSettings):
