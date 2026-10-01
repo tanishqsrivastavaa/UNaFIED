@@ -174,8 +174,8 @@ class ChatService:
                 )
             elif msg.role == "assistant":
                 full_content = msg.content
-                if msg.suggestion:
-                    full_content += f"\n\n[SYSTEM MEMORY: You suggested action'{msg.suggestion.get('label')}' using tool '{msg.suggestion.get('tool_name')}'.]"
+                if msg.suggestion and msg.suggestion.get("tool_name") == "reminder":
+                    full_content += f"\n\n[Reminder set: {msg.suggestion.get('label')}, due {msg.suggestion['parameters'].get('due_at')}]"
                 history.append(ModelResponse(parts=[TextPart(content=full_content)]))
 
         return history
