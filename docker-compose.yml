@@ -1,5 +1,5 @@
-version: "3.9"
-
+# Everything local: its own Postgres and Redis, never the shared Neon database.
+# Secrets (GROQ_API_KEY, GEMINI_API_KEY, SECRET_AUTH_KEY) come from backend/.env.
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -17,29 +17,38 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     ports:
       - "8000:8000"
     env_file:
       - ./backend/.env
     environment:
       - DATABASE_URL=postgresql://unafied:unafied_dev@postgres:5432/unafied
+      - REDIS_URL=redis://redis:6379/0
       - DEBUG=true
       - CORS_ORIGINS=http://localhost:5173
     depends_on:
       postgres:
         condition: service_healthy
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      redis:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - ./backend:/app
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    build: ./frontend
     ports:
       - "5173:5173"
     depends_on:
