@@ -2,13 +2,14 @@ import uuid
 from datetime import datetime
 from sqlmodel import SQLModel, Field
 from typing import Optional
+from ..core.clock import utcnow, UTCDateTime
 
 
 class User(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(unique=True, index=True)
     hashed_password: str | None = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     auth_provider: str | None = Field(default=None)
 
 
@@ -24,5 +25,5 @@ class UserPreferences(SQLModel, table=True):
     email_notifications: bool = Field(default=True)
     mention_notifications: bool = Field(default=True)
 
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)

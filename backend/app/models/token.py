@@ -1,9 +1,10 @@
 import uuid
 import hashlib
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from typing import Optional
 from sqlmodel import SQLModel, Field, Relationship
 from .user import User
+from ..core.clock import utcnow, UTCDateTime
 
 
 def _hash_token(raw_token: str) -> str:
@@ -17,8 +18,6 @@ class RefreshToken(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
     token_hash: str = Field(unique=True, index=True)
-    expires_at: datetime
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    expires_at: datetime = Field(sa_type=UTCDateTime)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     is_revoked: bool = Field(default=False)
