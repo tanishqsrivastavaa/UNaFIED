@@ -123,7 +123,7 @@ async def get_current_user_hashed(
     cache_key = f"user:{user_id}"
     cached = await redis.get(cache_key)
     if cached:
-        return User(**json.loads(cached))
+        return User.model_validate(json.loads(cached))  # User(**...) would leave the id as text
 
     user = session.exec(select(User).where(User.id==user_id)).first()
 
