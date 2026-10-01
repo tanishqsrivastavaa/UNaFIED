@@ -8,6 +8,7 @@ import { cn } from "../lib/cn";
 import Rail from "../components/chat/Rail";
 import Thread from "../components/chat/Thread";
 import Lobby from "../components/chat/Lobby";
+import Alerts from "../components/chat/Alerts";
 
 export default function ChatPage() {
     const { conversationId } = useParams();
@@ -57,6 +58,7 @@ export default function ChatPage() {
                     )}
                 </AnimatePresence>
             </main>
+            <Alerts />
         </div>
     );
 }
