@@ -268,12 +268,3 @@ export async function updateReminder(id: string, changes: { status?: "confirmed"
         body: JSON.stringify(changes),
     });
 }
-
-/* ── Tools ── */
-
-export async function executeTool(toolName: string, parameters: Record<string, unknown>) {
-    return apiFetch<{ tool_name: string; result: string }>("/tools/execute", {
-        method: "POST",
-        body: JSON.stringify({ tool_name: toolName, parameters }),
-    });
-}
