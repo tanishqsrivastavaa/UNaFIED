@@ -1,3 +1,4 @@
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlmodel import Session
@@ -60,3 +61,24 @@ async def read_users_me(
     current_user: User = Depends(get_current_user),
     redis = Depends(get_redis)):
     return current_user
+
+
+class TimezoneUpdate(BaseModel):
+    timezone: str
+
+
+@router.patch("/me", status_code=204)
+async def update_my_timezone(
+    body: TimezoneUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    redis = Depends(get_redis),
+):
+    try:
+        ZoneInfo(body.timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise HTTPException(status_code=422, detail="Unknown time zone")
+    current_user.timezone = body.timezone
+    session.add(current_user)
+    session.commit()
+    await redis.delete(f"user:{current_user.id}")  # chat routes cache the user for 5 minutes
