@@ -4,11 +4,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, LogOut, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { useChatStore } from "../../stores/chatStore";
+import { useReminderStore } from "../../stores/reminderStore";
 import { ago } from "../../lib/time";
 import { cn } from "../../lib/cn";
 import { modKey } from "../../lib/platform";
 import Kbd from "../ui/Kbd";
 import Wordmark from "../ui/Wordmark";
+import Reminders from "./Reminders";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const DISARM_MS = 3000;
@@ -75,6 +77,7 @@ export default function Rail({ onNew, creating, createError, className }: Props)
         setLeaving(true);
         await logout();
         reset();
+        useReminderStore.getState().reset();
         navigate("/login", { replace: true });
     };
 
@@ -108,6 +111,8 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                     </Kbd>
                 </button>
             </div>
+
+            <Reminders />
 
             <h2 className="sr-only">Conversations</h2>
 
