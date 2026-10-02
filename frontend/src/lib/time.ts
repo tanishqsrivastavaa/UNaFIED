@@ -8,6 +8,15 @@ export function serverDate(value: string): Date {
     return new Date(hasZone ? value : `${value}Z`);
 }
 
+/**
+ * A server time as a `datetime-local` value ("2026-10-02T16:00") in the browser's zone.
+ * `new Date(thatValue)` reads it back as local time.
+ */
+export function localInput(value: string): string {
+    const at = serverDate(value);
+    return new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
 export function clock(value: string): string {
     return serverDate(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
