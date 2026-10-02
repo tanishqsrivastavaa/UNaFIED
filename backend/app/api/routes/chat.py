@@ -136,6 +136,12 @@ async def invite_participant(
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
+    # The new person's list shows the conversation without a reload
+    await manager.notify_user(
+        participant.user_id,
+        {"type": "conversations_changed", "data": {}, "timestamp": datetime.now(timezone.utc).isoformat()},
+    )
+
     # Open threads update their participant list without a reload
     await manager.broadcast_to_conversation(
         conversation_id,
