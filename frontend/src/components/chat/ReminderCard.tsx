@@ -44,7 +44,8 @@ export default function ReminderCard({ suggestion }: { suggestion: Suggestion })
     const [failed, setFailed] = useState(false);
     const [now] = useState(() => Date.now());
 
-    const past = dueAt !== "" && serverDate(dueAt).getTime() < now;
+    const at = mine?.due_at ?? dueAt;
+    const past = at !== "" && serverDate(at).getTime() < now;
     const forOther = personalFor !== "" && personalFor !== me;
     const state: State | null =
         forOther || !loaded
@@ -85,9 +86,9 @@ export default function ReminderCard({ suggestion }: { suggestion: Suggestion })
                     {forOther ? `Reminder for ${personalName}` : LABEL[state ?? "set"]}
                 </p>
                 <p className="mt-2 truncate text-body font-medium tracking-[-0.01em] text-ink">{suggestion.label}</p>
-                {dueAt && (
-                    <time dateTime={dueAt} className="tnum text-meta text-ink-3">
-                        {when(dueAt, now)}
+                {at && (
+                    <time dateTime={at} className="tnum text-meta text-ink-3">
+                        {when(at, now)}
                     </time>
                 )}
                 {failed && (
