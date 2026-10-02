@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from app.api.v1 import users
-from app.api.routes import chat, reminders
+from app.api.routes import chat, reminders, push
 
 # from app.api.routes import tools
 from app.api.websockets import chat_ws
@@ -64,6 +64,7 @@ app.add_middleware(
 app.include_router(users.router, prefix="/api/v1", tags=["users"])
 app.include_router(chat.router, prefix="/api/v1/chats", tags=["chats"])
 app.include_router(reminders.router, prefix="/api/v1/reminders", tags=["reminders"])
+app.include_router(push.router, prefix="/api/v1/push", tags=["push"])
 # app.include_router(tools.router, prefix="/api/v1/tools", tags=["tools"])
 app.include_router(chat_ws.router, prefix="/api/v1", tags=["websockets"])
 
