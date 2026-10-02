@@ -24,8 +24,11 @@ class UserPreferences(SQLModel, table=True):
     enable_proactive_recommendations: bool = Field(default=True)
     recommendation_frequency: str = Field(default="medium")
 
-    email_notifications: bool = Field(default=True)
+    # Email is opt-in, and only sent when the server has SMTP settings.
+    email_notifications: bool = Field(default=False)
     mention_notifications: bool = Field(default=True)
+    # How long before a reminder's time the alert goes out.
+    reminder_lead_minutes: int = Field(default=15)
 
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
