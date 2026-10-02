@@ -594,6 +594,46 @@ class ChatService:
         return ParticipantRead(**participant.model_dump(), email=invitee.email)
 
     @staticmethod
+    def start_direct(
+        session: Session, user_id: uuid.UUID, email: str
+    ) -> tuple[Conversation, uuid.UUID | None]:
+        """
+        The chat with just you and that person: the most recent one, or a new one.
+        Returns it, plus the other person's id when it was just created.
+        """
+        user_id = uuid.UUID(str(user_id))  # the cached user may carry it as text
+        other = session.exec(
+            select(User).where(func.lower(User.email) == email.strip().lower())
+        ).first()
+        if not other:
+            raise LookupError("No account uses that email")
+        if other.id == user_id:
+            raise ValueError("That's your own email")
+
+        # Exactly two active people, and both of them are this pair
+        pair = session.exec(
+            select(Conversation)
+            .join(ConversationParticipant)
+            .where(ConversationParticipant.is_active == True)
+            .group_by(Conversation.id)
+            .having(
+                func.count() == 2,
+                func.count().filter(ConversationParticipant.user_id.in_([user_id, other.id])) == 2,
+            )
+            .order_by(desc(Conversation.updated_at))
+        ).first()
+        if pair:
+            return pair, None
+
+        me = session.get(User, user_id)
+        title = f"{me.email.split('@')[0]} & {other.email.split('@')[0]}"
+        conversation = ChatService.create_conversation(session, user_id, ConversationCreate(title=title))
+        session.add(ConversationParticipant(conversation_id=conversation.id, user_id=other.id, role="member"))
+        session.commit()
+        session.refresh(conversation)
+        return conversation, other.id
+
+    @staticmethod
     def get_conversation_detail(
         session: Session, user_id: uuid.UUID, conversation_id: uuid.UUID
     ) -> dict | None:

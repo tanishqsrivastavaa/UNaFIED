@@ -110,6 +110,29 @@ async def stream_message(
     )
 
 
+@router.post("/direct", response_model=ConversationRead)
+async def start_direct_chat(
+    body: ParticipantInvite,
+    current_user: User = Depends(get_current_user_hashed),
+    session: Session = Depends(get_session),
+    manager: ConnectionManager = Depends(get_connection_manager),
+):
+    """Opens your chat with the person behind an email, starting one if there is none."""
+    try:
+        conversation, new_member = ChatService.start_direct(session, current_user.id, body.email)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    if new_member:
+        await manager.notify_user(
+            new_member,
+            {"type": "conversations_changed", "data": {}, "timestamp": datetime.now(timezone.utc).isoformat()},
+        )
+    return ConversationRead(**conversation.model_dump(), participant_count=2)
+
+
 @router.post(
     "/{conversation_id}/participants",
     response_model=ParticipantRead,
