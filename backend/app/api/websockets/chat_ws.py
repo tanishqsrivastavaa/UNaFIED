@@ -26,6 +26,34 @@ from app.core.logger import logger
 router = APIRouter()
 
 
+@router.websocket("/ws")
+async def user_websocket(
+    websocket: WebSocket,
+    token: str = Query(...),
+    manager: ConnectionManager = Depends(get_connection_manager),
+):
+    """
+    One socket per open app tab, for what happens outside the thread on screen:
+    activity in other conversations, new conversations, and reminders.
+    The client never sends anything; reading just notices when it closes.
+    """
+    try:
+        with SessionLocal() as s:
+            user = await authenticate_ws_token(token, s)
+    except HTTPException as e:
+        await websocket.close(code=1008, reason=e.detail)
+        return
+
+    await manager.connect_user(websocket, user.id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await manager.disconnect_user(user.id, websocket)
+
+
 @router.websocket("/chats/{conversation_id}/ws")
 async def chat_websocket(
     websocket: WebSocket,
