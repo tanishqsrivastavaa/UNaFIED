@@ -297,3 +297,25 @@ export async function updatePreferences(changes: Partial<Pick<Preferences, "remi
         body: JSON.stringify(changes),
     });
 }
+
+/* ── Push ── */
+
+/** The key browsers subscribe with; null when the server has push turned off. */
+export async function getPushKey() {
+    return apiFetch<{ public_key: string | null }>("/push/key");
+}
+
+/** Files this browser's subscription under the signed-in person, moving it if someone else had it. */
+export async function savePushSubscription(subscription: PushSubscriptionJSON) {
+    return apiFetch<void>("/push/subscriptions", {
+        method: "POST",
+        body: JSON.stringify(subscription),
+    });
+}
+
+export async function deletePushSubscription(endpoint: string) {
+    return apiFetch<void>("/push/subscriptions", {
+        method: "DELETE",
+        body: JSON.stringify({ endpoint }),
+    });
+}
