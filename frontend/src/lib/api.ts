@@ -79,7 +79,8 @@ async function apiFetch<T>(
 
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || `API error ${res.status}`);
+        const detail = Array.isArray(body.detail) ? body.detail[0]?.msg : body.detail;
+        throw new Error(detail || `API error ${res.status}`);
     }
 
     // 204 No Content
