@@ -9,6 +9,9 @@ const ALERTED_KEY = "unafied:alerted";
 /** Reminders already alerted. Kept in memory too, so blocked storage can't cause repeats. */
 const alerted = new Set<string>();
 
+/** Keyed by time as well, so a reminder moved after its alert alerts again at the new time. */
+const alertKey = (r: Reminder) => `${r.id}@${serverDate(r.due_at).getTime()}`;
+
 const byTime = (a: Reminder, b: Reminder) => serverDate(a.due_at).getTime() - serverDate(b.due_at).getTime();
 
 function syncAlerted(add: string[] = []) {
@@ -74,10 +77,10 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
         syncAlerted();
         const due = get().reminders.filter((r) => {
             const at = serverDate(r.due_at).getTime();
-            return r.status === "sent" && !alerted.has(r.id) && now <= at + GRACE_MS;
+            return r.status === "sent" && !alerted.has(alertKey(r)) && now <= at + GRACE_MS;
         });
         if (due.length === 0) return;
-        syncAlerted(due.map((r) => r.id));
+        syncAlerted(due.map(alertKey));
         set((s) => ({ alerts: [...s.alerts, ...due] }));
         due.forEach(notify);
     },
