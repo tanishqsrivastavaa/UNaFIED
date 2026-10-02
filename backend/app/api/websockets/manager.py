@@ -206,6 +206,21 @@ class ConnectionManager:
         """Check if a user is connected to a conversation"""
         return bool(self.active_connections.get(conversation_id, {}).get(user_id))
 
+    async def drop_user(self, conversation_id: uuid.UUID, user_id: uuid.UUID):
+        """Close one person's sockets in a conversation once they are out of it.
+
+        Untracked first, so their handler's own disconnect is a no-op and announces nothing.
+        """
+        # ponytail: closes this server's sockets only; a second server keeps its own
+        # until the person's app closes it. Publish a drop over Redis when scaling out.
+        sockets = self.active_connections.get(conversation_id, {}).get(user_id, set())
+        for websocket in list(sockets):
+            await self.disconnect(conversation_id, user_id, websocket)
+            try:
+                await websocket.close(code=1000, reason="No longer in this conversation")
+            except Exception:
+                pass  # already closing
+
     async def close_all(self):
         """Close all connections (for shutdown)"""
         for users in list(self.active_connections.values()):

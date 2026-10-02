@@ -4,7 +4,8 @@ from ..core.clock import utcnow
 from ..models.user import User
 from ..schemas.participants import ParticipantRead
 from typing import List, Sequence, AsyncGenerator
-from sqlmodel import Session, select, desc, asc, func
+from sqlmodel import Session, select, desc, asc, func, or_
+from sqlalchemy.orm import aliased
 from ..models.chats import (
     Conversation,
     Message,
@@ -61,51 +62,54 @@ class ChatService:
     def get_user_conversations(
         session: Session, user_id: uuid.UUID, skip: int = 0, limit: int = 20
     ) -> dict:
-        """Get all conversations where user is a participant"""
+        """The user's conversations, latest activity first, each with its member count and unread flag"""
+        user_id = uuid.UUID(str(user_id))  # the cached user may carry it as text
+        mine = (
+            ConversationParticipant.user_id == user_id,
+            ConversationParticipant.is_active == True,
+        )
 
-        # Count total conversations
         total = session.exec(
             select(func.count())
             .select_from(Conversation)
             .join(ConversationParticipant)
-            .where(
-                ConversationParticipant.user_id == user_id,
-                ConversationParticipant.is_active == True,
-            )
+            .where(*mine)
         ).one()
 
-        # Get conversations
-        statement = (
-            select(Conversation)
-            .join(ConversationParticipant)
+        others = aliased(ConversationParticipant)
+        members = (
+            select(func.count())
+            .where(others.conversation_id == Conversation.id, others.is_active == True)
+            .scalar_subquery()
+        )
+        # Unread: anyone else (people or the assistant) wrote since my last read, or since I joined
+        unread = (
+            select(Message.id)
             .where(
-                ConversationParticipant.user_id == user_id,
-                ConversationParticipant.is_active == True,
+                Message.conversation_id == Conversation.id,
+                or_(Message.sender_id.is_(None), Message.sender_id != user_id),
+                Message.created_at
+                > func.coalesce(
+                    ConversationParticipant.last_read_at, ConversationParticipant.joined_at
+                ),
             )
+            .exists()
+        )
+
+        rows = session.exec(
+            select(Conversation, members, unread)
+            .join(ConversationParticipant)
+            .where(*mine)
             .order_by(desc(Conversation.updated_at))
             .offset(skip)
             .limit(limit)
-        )
-        items = session.exec(statement).all()
+        ).all()
 
-        # Add participant count to each conversation
-        result_items = []
-        for item in items:
-            participant_count = session.exec(
-                select(func.count())
-                .select_from(ConversationParticipant)
-                .where(
-                    ConversationParticipant.conversation_id == item.id,
-                    ConversationParticipant.is_active == True,
-                )
-            ).one()
-
-            # Convert to dict and add count
-            item_dict = item.model_dump()
-            item_dict["participant_count"] = participant_count
-            result_items.append(item_dict)
-
-        return {"items": result_items, "total": total}
+        items = [
+            {**c.model_dump(), "participant_count": count, "unread": bool(new)}
+            for c, count, new in rows
+        ]
+        return {"items": items, "total": total}
 
     @staticmethod
     def get_conversation(
@@ -592,6 +596,66 @@ class ChatService:
         session.commit()
         session.refresh(participant)
         return ParticipantRead(**participant.model_dump(), email=invitee.email)
+
+    @staticmethod
+    def remove_participant(
+        session: Session,
+        conversation_id: uuid.UUID,
+        actor_id: uuid.UUID,
+        target_id: uuid.UUID,
+    ) -> uuid.UUID:
+        """
+        Takes someone out: themselves (leaving), or anyone when the owner does it.
+        If the owner goes, the earliest-joined member left takes over. Returns the owner after.
+        """
+        from ..services.permissions import ConversationPermissions
+
+        actor_id, target_id = uuid.UUID(str(actor_id)), uuid.UUID(str(target_id))
+        if not ConversationPermissions.can_send_message(session, conversation_id, actor_id):
+            raise LookupError("Conversation not found")
+        if not ConversationPermissions.can_remove(session, conversation_id, actor_id, target_id):
+            raise PermissionError("Only the owner can remove people")
+
+        active = session.exec(
+            select(ConversationParticipant)
+            .where(
+                ConversationParticipant.conversation_id == conversation_id,
+                ConversationParticipant.is_active == True,
+            )
+            .order_by(asc(ConversationParticipant.joined_at))
+        ).all()
+        target = next((p for p in active if p.user_id == target_id), None)
+        if not target:
+            raise LookupError("That person isn't in this conversation")
+        rest = [p for p in active if p is not target]
+        if not rest:
+            raise ValueError("You're the only one here. Delete the conversation instead.")
+
+        target.is_active = False
+        target.left_at = utcnow()
+        conversation = session.get(Conversation, conversation_id)
+        if conversation.owner_id == target_id:
+            conversation.owner_id = rest[0].user_id
+            rest[0].role = "owner"
+            target.role = "member"
+        session.commit()
+        return conversation.owner_id
+
+    @staticmethod
+    def mark_read(session: Session, conversation_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        """Everything in the conversation so far counts as read. False if the user isn't in it."""
+        participant = session.exec(
+            select(ConversationParticipant).where(
+                ConversationParticipant.conversation_id == conversation_id,
+                ConversationParticipant.user_id == uuid.UUID(str(user_id)),
+                ConversationParticipant.is_active == True,
+            )
+        ).first()
+        if not participant:
+            return False
+        participant.last_read_at = utcnow()
+        session.commit()
+        return True
 
     @staticmethod
     def start_direct(

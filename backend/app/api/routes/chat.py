@@ -175,3 +175,68 @@ async def invite_participant(
         },
     )
     return participant
+
+
+async def _take_out(
+    session: Session,
+    manager: ConnectionManager,
+    conversation_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    target_id: uuid.UUID,
+):
+    """Leaving and removing: the change, then everyone's screens."""
+    target_id = uuid.UUID(str(target_id))  # the cached user may carry it as text
+    try:
+        owner_id = ChatService.remove_participant(session, conversation_id, actor_id, target_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    stamp = datetime.now(timezone.utc).isoformat()
+    # Open threads drop them from the list, and pick up a new owner if there is one
+    await manager.broadcast_to_conversation(
+        conversation_id,
+        {
+            "type": "participant_removed",
+            "data": {"user_id": str(target_id), "owner_id": str(owner_id)},
+            "timestamp": stamp,
+        },
+    )
+    await manager.notify_user(target_id, {"type": "conversations_changed", "data": {}, "timestamp": stamp})
+    # After the event, so their open thread hears why it is closing
+    await manager.drop_user(conversation_id, target_id)
+
+
+@router.delete("/{conversation_id}/participants/me", status_code=204)
+async def leave_conversation(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user_hashed),
+    session: Session = Depends(get_session),
+    manager: ConnectionManager = Depends(get_connection_manager),
+):
+    await _take_out(session, manager, conversation_id, current_user.id, current_user.id)
+
+
+@router.delete("/{conversation_id}/participants/{user_id}", status_code=204)
+async def remove_participant(
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    current_user: User = Depends(get_current_user_hashed),
+    session: Session = Depends(get_session),
+    manager: ConnectionManager = Depends(get_connection_manager),
+):
+    """The owner removes anyone; everyone else can only remove themselves."""
+    await _take_out(session, manager, conversation_id, current_user.id, user_id)
+
+
+@router.post("/{conversation_id}/read", status_code=204)
+def mark_read(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user_hashed),
+    session: Session = Depends(get_session),
+):
+    if not ChatService.mark_read(session, conversation_id, current_user.id):
+        raise HTTPException(status_code=404, detail="Conversation not found")

@@ -18,6 +18,7 @@ class ConversationRead(SQLModel):
     created_at: datetime
     updated_at: datetime
     participant_count: int = 0
+    unread: bool = False
 
 
 class MessageRead(SQLModel):
