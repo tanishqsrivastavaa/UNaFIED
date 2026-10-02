@@ -3,6 +3,7 @@ from typing import List, Literal, Optional
 from fastapi import Depends, APIRouter, HTTPException
 from sqlmodel import Session, select
 from ...core.clock import utcnow
+from ..websockets.manager import get_connection_manager
 from ...core.security import get_current_user_hashed
 from ...db.db import get_session
 from ...models.reminder import Reminder
@@ -26,7 +27,7 @@ def list_reminders(
 
 
 @router.patch("/{reminder_id}", response_model=ReminderRead)
-def update_reminder(
+async def update_reminder(
     reminder_id: uuid.UUID,
     changes: ReminderUpdate,
     current_user: User = Depends(get_current_user_hashed),
@@ -40,10 +41,19 @@ def update_reminder(
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
 
-    for field, value in changes.model_dump(exclude_unset=True, exclude_none=True).items():
+    updates = changes.model_dump(exclude_unset=True, exclude_none=True)
+    # A new time re-arms a reminder whose alert already went out
+    if "due_at" in updates and "status" not in updates and reminder.status == "sent":
+        updates["status"] = "confirmed"
+    for field, value in updates.items():
         setattr(reminder, field, value)
     reminder.updated_at = utcnow()
     session.add(reminder)
     session.commit()
     session.refresh(reminder)
+
+    # The person's other tabs refresh their list
+    await get_connection_manager().notify_user(
+        reminder.user_id, {"type": "reminders_changed", "data": {}, "timestamp": utcnow().isoformat()}
+    )
     return reminder
