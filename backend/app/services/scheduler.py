@@ -1,6 +1,7 @@
 """
 Fires reminders when they come due: marks each one sent, alerts every open tab
-of its owner, and emails people who turned email on. "Due" means within the
+of its owner, pushes to browsers that asked for alerts while the app is closed,
+and emails people who turned email on. "Due" means within the
 owner's lead time of the reminder's time.
 
 All state lives in the reminder table, so a restart picks up where it left off,
@@ -12,13 +13,15 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from sqlalchemy import update
+from sqlalchemy import delete, update
 from sqlmodel import select
 from ..api.websockets.manager import get_connection_manager
 from ..core.clock import utcnow
 from ..core.email import email_configured, send_email
 from ..core.logger import logger
+from ..core.push import push_configured, send_push
 from ..db.db import SessionLocal
+from ..models.push import PushSubscription
 from ..models.reminder import Reminder
 from ..models.user import User, UserPreferences
 
@@ -51,6 +54,31 @@ async def run(sessions=SessionLocal) -> None:
 def _utc(at: datetime) -> datetime:
     """Database times are UTC; SQLite hands them back without a zone."""
     return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+
+
+async def _push(due: Due, sessions) -> None:
+    """Alerts each browser the owner subscribed, and forgets the ones that are gone. Never raises."""
+    try:
+        local = due.at.astimezone(ZoneInfo(due.zone))
+        payload = {
+            "title": due.title,
+            "body": f"{local.strftime('%a %d %b')}, {local.strftime('%I:%M %p').lstrip('0')}",
+            "url": f"/chat/{due.conversation_id}" if due.conversation_id else "/chat",
+            # Same tag as an open tab's own alert, so the OS shows just one.
+            "tag": str(due.id),
+        }
+        with sessions() as s:
+            subs = s.exec(select(PushSubscription).where(PushSubscription.user_id == due.user_id)).all()
+        gone = []
+        for sub in subs:
+            if not await asyncio.to_thread(send_push, sub, payload):
+                gone.append(sub.id)
+        if gone:
+            with sessions() as s:
+                s.execute(delete(PushSubscription).where(PushSubscription.id.in_(gone)))
+                s.commit()
+    except Exception:
+        logger.exception(f"Reminder push failed for {due.id}")
 
 
 async def fire_due(sessions=SessionLocal) -> list[uuid.UUID]:
@@ -108,6 +136,8 @@ async def fire_due(sessions=SessionLocal) -> list[uuid.UUID]:
                 )
             except Exception:
                 logger.exception(f"Reminder email failed for {due.id}")
+        if push_configured():
+            await _push(due, sessions)
     if fired:
         logger.info(f"Scheduler fired {len(fired)} reminder(s)")
     return [due.id for due in fired]
