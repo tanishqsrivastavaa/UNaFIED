@@ -20,6 +20,7 @@ from app.models.chats import (
     FileEmbedding,
 )
 from app.models.reminder import Reminder
+from app.models.push import PushSubscription
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
