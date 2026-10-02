@@ -5,6 +5,9 @@ import {
     getConversationDetail,
     getConversations,
     inviteParticipant,
+    leaveConversation,
+    markRead,
+    removeParticipant,
     sendMessageStream,
     startDirectChat,
     type Conversation,
@@ -47,6 +50,23 @@ export const freshConversations = new Set<string>();
 /** Conversations with a live socket, so a late load can't open one after close. */
 const active = new Set<string>();
 
+/** Conversations you are leaving here, whose own removal event isn't news. */
+const leaving = new Set<string>();
+
+/** At most one "read" call per conversation this often while messages keep arriving. */
+const READ_EVERY = 1500;
+const readTimers = new Map<string, number>();
+
+function readNow(id: string) {
+    window.clearTimeout(readTimers.get(id));
+    readTimers.delete(id);
+    void markRead(id).catch(() => undefined);
+}
+
+function readSoon(id: string) {
+    if (!readTimers.has(id)) readTimers.set(id, window.setTimeout(() => readNow(id), READ_EVERY));
+}
+
 interface Pending {
     localId: string;
     content: string;
@@ -69,8 +89,10 @@ interface ChatState {
     status: Record<string, SocketStatus>;
     typingSent: Record<string, boolean>;
     pending: Record<string, Pending | null>;
-    /** Conversations with new messages since they were last open. */
+    /** Conversations with new messages since they were last open; seeded from the server's list. */
     unread: Record<string, boolean>;
+    /** Threads you were taken out of while they were open. */
+    removed: Record<string, boolean>;
 
     load: () => Promise<void>;
     /** Creates a conversation and puts it at the top of the list. Throws on failure. */
@@ -87,6 +109,10 @@ interface ChatState {
     setTyping: (id: string, isTyping: boolean) => void;
     /** Adds someone by email. Throws with the server's reason on failure. */
     invite: (id: string, email: string) => Promise<void>;
+    /** Takes you out of the conversation and drops it from your list. Throws with the server's reason. */
+    leave: (id: string) => Promise<void>;
+    /** Owner only. Throws with the server's reason on failure. */
+    removeMember: (id: string, userId: string) => Promise<void>;
     /** Opens (or starts) your chat with one person. Throws with the server's reason on failure. */
     direct: (email: string) => Promise<Conversation>;
     /** Listens for what happens outside the open thread: activity elsewhere, new conversations, reminders. */
@@ -120,6 +146,7 @@ export const useChatStore = create<ChatState>((set, get) => {
             participants: { ...s.participants, [id]: data.participants ?? [] },
         }));
         get().syncTitle(id, data.title);
+        readNow(id); // only an open thread refreshes, so what it just fetched has been seen
     };
 
     /**
@@ -212,6 +239,7 @@ export const useChatStore = create<ChatState>((set, get) => {
                 });
                 // The server has the message, so the send is done; a reply, if any, arrives separately
                 if (settled && pending) pending.resolve(true);
+                readSoon(id); // seen as it lands, so it stays read after a reload
                 break;
             }
 
@@ -248,6 +276,7 @@ export const useChatStore = create<ChatState>((set, get) => {
                     };
                 });
                 if (accepted && pending) pending.resolve(true);
+                if (accepted) readSoon(id);
                 break;
             }
 
@@ -288,6 +317,33 @@ export const useChatStore = create<ChatState>((set, get) => {
                 set((s) => ({
                     ...s,
                     participants: { ...s.participants, [id]: withMember(s.participants[id], { user_id, email, is_active: true }) },
+                }));
+                break;
+            }
+
+            case "participant_removed": {
+                const { user_id, owner_id } = event.data as { user_id: string; owner_id?: string };
+                if (user_id === useAuthStore.getState().user?.id) {
+                    if (leaving.has(id)) break; // you left from here; the panel takes you out
+                    get().closeThread(id);
+                    set((s) => ({
+                        removed: { ...s.removed, [id]: true },
+                        conversations: s.conversations.filter((c) => c.id !== id),
+                    }));
+                    break;
+                }
+                set((s) => ({
+                    ...s,
+                    participants: {
+                        ...s.participants,
+                        [id]: (s.participants[id] ?? []).map((p) => ({
+                            ...p,
+                            is_active: p.is_active && p.user_id !== user_id,
+                            role: owner_id ? (p.user_id === owner_id ? "owner" : "member") : p.role,
+                        })),
+                    },
+                    peers: { ...s.peers, [id]: (s.peers[id] ?? []).filter((p) => p.userId !== user_id) },
+                    typing: { ...s.typing, [id]: (s.typing[id] ?? []).filter((t) => t.userId !== user_id) },
                 }));
                 break;
             }
@@ -333,12 +389,21 @@ export const useChatStore = create<ChatState>((set, get) => {
         typingSent: {},
         pending: {},
         unread: {},
+        removed: {},
 
         load: async () => {
             if (get().conversations.length === 0) set({ listState: "loading" });
             try {
                 const data = await getConversations(0, 50);
-                set({ conversations: data.items, listState: "ready" });
+                set((s) => ({
+                    conversations: data.items,
+                    listState: "ready",
+                    // The server remembers what you've read; the open thread is read by definition
+                    unread: {
+                        ...s.unread,
+                        ...Object.fromEntries(data.items.map((c) => [c.id, !!c.unread && !active.has(c.id)])),
+                    },
+                }));
             } catch {
                 set({ listState: "error" });
             }
@@ -364,7 +429,7 @@ export const useChatStore = create<ChatState>((set, get) => {
 
         openThread: (id) => {
             active.add(id);
-            if (get().unread[id]) set((s) => ({ unread: { ...s.unread, [id]: false } }));
+            set((s) => ({ unread: { ...s.unread, [id]: false }, removed: { ...s.removed, [id]: false } }));
 
             const begin = () => {
                 if (!active.has(id)) return;
@@ -389,6 +454,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         closeThread: (id) => {
             active.delete(id);
             closeSocket(id);
+            if (readTimers.has(id)) readNow(id); // don't lose a read that was waiting
             get().pending[id]?.resolve(false);
             set((s) => ({
                 streaming: { ...s.streaming, [id]: null },
@@ -454,6 +520,27 @@ export const useChatStore = create<ChatState>((set, get) => {
             set((s) => ({ participants: { ...s.participants, [id]: withMember(s.participants[id], added) } }));
         },
 
+        leave: async (id) => {
+            leaving.add(id);
+            try {
+                await leaveConversation(id);
+                get().closeThread(id);
+                set((s) => ({ conversations: s.conversations.filter((c) => c.id !== id) }));
+            } finally {
+                leaving.delete(id);
+            }
+        },
+
+        removeMember: async (id, userId) => {
+            await removeParticipant(id, userId);
+            set((s) => ({
+                participants: {
+                    ...s.participants,
+                    [id]: (s.participants[id] ?? []).map((p) => (p.user_id === userId ? { ...p, is_active: false } : p)),
+                },
+            }));
+        },
+
         direct: async (email) => {
             const convo = await startDirectChat(email);
             set((s) => ({ conversations: [convo, ...s.conversations.filter((c) => c.id !== convo.id)], listState: "ready" }));
@@ -496,6 +583,8 @@ export const useChatStore = create<ChatState>((set, get) => {
             closeAllSockets();
             active.clear();
             freshConversations.clear();
+            for (const timer of readTimers.values()) window.clearTimeout(timer);
+            readTimers.clear();
             set({
                 conversations: [],
                 listState: "loading",
@@ -510,6 +599,7 @@ export const useChatStore = create<ChatState>((set, get) => {
                 typingSent: {},
                 pending: {},
                 unread: {},
+                removed: {},
             });
         },
     };
