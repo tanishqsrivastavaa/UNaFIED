@@ -61,6 +61,8 @@ class ConversationParticipant(SQLModel, table=True):
     joined_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     left_at: Optional[datetime] = Field(default=None, sa_type=UTCDateTime)
     is_active: bool = Field(default=True)
+    # Messages from others after this (or after joined_at, until the first read) are unread
+    last_read_at: Optional[datetime] = Field(default=None, sa_type=UTCDateTime)
 
     conversation: Optional["Conversation"] = Relationship(back_populates="participants")
 
