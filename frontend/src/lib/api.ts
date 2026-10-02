@@ -319,3 +319,30 @@ export async function deletePushSubscription(endpoint: string) {
         body: JSON.stringify({ endpoint }),
     });
 }
+
+/* ── People and read state ── */
+
+// Fields the server already sends, merged into the types above.
+export interface Conversation {
+    owner_id?: string;
+    /** Someone else wrote since you last read it. */
+    unread?: boolean;
+}
+
+export interface Participant {
+    role?: "owner" | "member";
+}
+
+/** Throws with the server's reason, e.g. when you're the last one here. */
+export async function leaveConversation(conversationId: string) {
+    return apiFetch<void>(`/chats/${conversationId}/participants/me`, { method: "DELETE" });
+}
+
+/** Owner only. */
+export async function removeParticipant(conversationId: string, userId: string) {
+    return apiFetch<void>(`/chats/${conversationId}/participants/${userId}`, { method: "DELETE" });
+}
+
+export async function markRead(conversationId: string) {
+    return apiFetch<void>(`/chats/${conversationId}/read`, { method: "POST" });
+}
