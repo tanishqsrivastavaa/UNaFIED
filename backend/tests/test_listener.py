@@ -51,6 +51,9 @@ def chat(monkeypatch):
         async def broadcast_to_conversation(self, conversation_id, event, exclude_user=None):
             events.append(event)
 
+        async def notify_user(self, user_id, event):
+            events.append({**event, "to": user_id})
+
     monkeypatch.setattr(listener, "get_connection_manager", lambda: FakeManager())
 
     async def say(user_id, text, decision):
@@ -77,12 +80,19 @@ def chat(monkeypatch):
             s.add(p)
             s.commit()
 
-    return sam, manish, say, rows, seen, leave, acks, events
+    def set_all(status):
+        with Session(engine) as s:
+            for r in s.exec(select(Reminder)).all():
+                r.status = status
+                s.add(r)
+            s.commit()
+
+    return sam, manish, say, rows, seen, leave, acks, events, set_all
 
 
 @pytest.mark.asyncio
 async def test_plan_waits_for_the_other_person(chat):
-    sam, manish, say, rows, seen, _, acks, events = chat
+    sam, manish, say, rows, seen, _, acks, events, set_all = chat
 
     await say(sam, "coffee at 4?", D(action="propose", title="Coffee", when=datetime(2030, 1, 1, 16, 0)))
     assert len(rows()) == 2 and {r.status for r in rows()} == {"proposed"}
@@ -98,7 +108,9 @@ async def test_plan_waits_for_the_other_person(chat):
     [ack] = acks()
     assert ack.is_proactive and ack.suggestion["tool_name"] == "reminder"
     assert ack.suggestion["parameters"]["plan"] == str(rows()[0].message_id)
-    assert [e["type"] for e in events[-2:]] == ["message", "reminders_changed"]
+    # The card goes to the chat; each person's tabs are told to refresh their list
+    assert [e["type"] for e in events[-3:]] == ["message", "reminders_changed", "reminders_changed"]
+    assert {e["to"] for e in events[-2:]} == {sam, manish}
     # The model saw the plan in Manish's zone, with Sam as its proposer
     zone, plans, lines = seen[-1]
     assert zone == "UTC" and plans[0].proposer == "sam" and plans[0].at.strftime("%H:%M") == "10:30"
@@ -107,6 +119,11 @@ async def test_plan_waits_for_the_other_person(chat):
     sent = len(events)
     await say(manish, "great, see you!", D(action="agree", plan=1))
     assert len(acks()) == 1 and len(events) == sent  # agreeing again changes nothing
+
+    # Once the scheduler has alerted, the plan is still live and still agreed
+    set_all("sent")
+    await say(sam, "on my way", D(action="none"))
+    assert seen[-1][1][0].agreed is True
 
     await say(manish, "make it 5?", D(action="change", plan=1, when=datetime(2030, 1, 1, 17, 0)))
     assert {(r.status, r.due_at.strftime("%H:%M")) for r in rows()} == {("proposed", "17:00")}
@@ -124,7 +141,7 @@ async def test_plan_waits_for_the_other_person(chat):
 
 @pytest.mark.asyncio
 async def test_ignores_past_repeated_and_unknown_plans(chat):
-    sam, manish, say, rows, _, _, acks, events = chat
+    sam, manish, say, rows, _, _, acks, events, _ = chat
 
     await say(sam, "yesterday at 4", D(action="propose", title="Coffee", when=datetime(2020, 1, 1, 16, 0)))
     assert rows() == []
@@ -140,7 +157,7 @@ async def test_ignores_past_repeated_and_unknown_plans(chat):
 
 @pytest.mark.asyncio
 async def test_solo_chat_is_left_alone(chat):
-    sam, manish, say, rows, seen, leave, acks, events = chat
+    sam, manish, say, rows, seen, leave, acks, events, _ = chat
     leave(manish)
     await say(sam, "remind me, dentist at 4", D(action="propose", title="Dentist", when=datetime(2030, 1, 1, 16, 0)))
     assert rows() == [] and seen == [] and events == []

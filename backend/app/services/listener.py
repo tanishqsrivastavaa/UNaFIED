@@ -24,7 +24,7 @@ from ..models.reminder import Reminder
 from ..models.user import User
 
 HISTORY = 12  # messages of context the model sees
-OPEN = ("proposed", "confirmed")
+OPEN = ("proposed", "confirmed", "sent")  # "sent": alerted, but the meeting may still be ahead
 
 _tasks: set[asyncio.Task] = set()
 # ponytail: per-process locks keep one conversation's messages in order on a single
@@ -105,7 +105,7 @@ async def listen(conversation_id: uuid.UUID, message_id: uuid.UUID, sessions=Ses
         for key in keys:
             row = next(r for r in rows if r.message_id == key)
             dues.append(_local(row.due_at, timezone.utc))
-            plans.append(Plan(row.title, _local(row.due_at, zone), names.get(proposer[key], "someone"), row.status == "confirmed"))
+            plans.append(Plan(row.title, _local(row.due_at, zone), names.get(proposer[key], "someone"), row.status != "proposed"))
 
         member_ids = [uid for uid, _, _ in members]
         sender_id = message.sender_id
@@ -190,4 +190,5 @@ async def listen(conversation_id: uuid.UUID, message_id: uuid.UUID, sessions=Ses
     stamp = utcnow().isoformat()
     if ack:
         await manager.broadcast_to_conversation(conversation_id, {"type": "message", "data": ack, "timestamp": stamp})
-    await manager.broadcast_to_conversation(conversation_id, {"type": "reminders_changed", "data": {}, "timestamp": stamp})
+    for uid in member_ids:
+        await manager.notify_user(uid, {"type": "reminders_changed", "data": {}, "timestamp": stamp})
