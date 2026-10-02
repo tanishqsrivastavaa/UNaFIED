@@ -13,10 +13,14 @@ ZONE = "Asia/Kolkata"
 COFFEE = Plan("Coffee", datetime(2026, 10, 1, 16, 0), "sam", agreed=False)
 CALL = Plan("Project call", datetime(2026, 10, 2, 10, 0), "manish", agreed=True)
 DINNER = Plan("Dinner", datetime(2026, 10, 2, 20, 0), "manish", agreed=False)
+MOM = Plan("Call mom", datetime(2026, 10, 1, 18, 0), "sam", agreed=True, personal=True)
+LUNCH = Plan("Lunch", datetime(2026, 10, 1, 13, 0), "sam", agreed=True)  # a group plan manish said yes to
 
 ASK_COFFEE = ("sam", "coffee at 4 today?")
 ASK_CALL = [("manish", "call tomorrow at 10 about the project?"), ("sam", "yes works")]
 ASK_DINNER = ("manish", "dinner tomorrow at 8?")
+ASK_MOM = ("sam", "remind me to call mom at 6")
+ASK_LUNCH = [("sam", "lunch at 1 today?"), ("manish", "I'm in")]
 
 # (plans, messages oldest first, expected). Expected is (action,), (action, plan),
 # (action, "YYYY-MM-DD HH:MM") or (action, plan, "YYYY-MM-DD HH:MM").
@@ -69,6 +73,30 @@ CASES = [
     ([COFFEE], [ASK_COFFEE, ("manish", "nah I'm not free")], ("cancel", 1)),
     ([COFFEE, CALL], [*ASK_CALL, ASK_COFFEE, ("sam", "let's skip the call tomorrow")], ("cancel", 2)),
     ([COFFEE], [ASK_COFFEE, ("sam", "never mind about coffee")], ("cancel", 1)),
+    # Personal reminders, alone with the assistant (one speaker) or in a shared chat
+    ([], [ASK_MOM], ("remind", "2026-10-01 18:00")),
+    ([], [("sam", "remind me tomorrow at 9 to send the deck")], ("remind", "2026-10-02 09:00")),
+    ([], [("sam", "remind me in 20 minutes to check the oven")], ("remind", "2026-10-01 10:50")),
+    ([], [("sam", "can you remind me to take my meds at 9 pm")], ("remind", "2026-10-01 21:00")),
+    ([], [("sam", "remind me to call mom"), ("sam", "at 6 pm")], ("remind", "2026-10-01 18:00")),
+    ([], [("manish", "mujhe kal subah 8 baje gym ke liye yaad dilana")], ("remind", "2026-10-02 08:00")),
+    ([], [("manish", "how's the deck going?"), ("sam", "almost done, remind me to send it at 5")], ("remind", "2026-10-01 17:00")),
+    ([COFFEE], [ASK_COFFEE, ("manish", "sure"), ("manish", "also remind me to book a cab at 3:30")], ("remind", "2026-10-01 15:30")),
+    # Its owner changes or cancels it; others can't agree to it
+    ([MOM], [ASK_MOM, ("sam", "actually make it 7")], ("change", 1, "2026-10-01 19:00")),
+    ([MOM], [ASK_MOM, ("sam", "cancel that reminder")], ("cancel", 1)),
+    ([COFFEE, MOM], [ASK_COFFEE, ASK_MOM, ("sam", "push my mom reminder to 8 pm")], ("change", 2, "2026-10-01 20:00")),
+    ([MOM, COFFEE], [ASK_MOM, ASK_COFFEE, ("manish", "sure, see you at 4")], ("agree", 2)),
+    ([MOM], [ASK_MOM, ("manish", "nice, say hi to her")], ("none",)),
+    ([MOM], [ASK_MOM, ("sam", "thanks!")], ("none",)),
+    # Not reminders
+    ([], [("sam", "remind me what we said about the budget?")], ("none",)),
+    ([], [("manish", "I'll remind him about the meeting")], ("none",)),
+    ([], [("sam", "remind me later")], ("none",)),
+    ([], [("sam", "that reminds me, did you pay the rent?")], ("none",)),
+    # Groups: each person answers for themselves
+    ([LUNCH], [*ASK_LUNCH, ("lee", "count me in too")], ("agree", 1)),
+    ([LUNCH], [*ASK_LUNCH, ("lee", "can't make it, sorry")], ("cancel", 1)),
 ]
 
 
@@ -76,8 +104,8 @@ def got(d) -> tuple:
     when = d.when.strftime("%Y-%m-%d %H:%M") if d.when else None
     if d.action == "none":
         return ("none",)
-    if d.action == "propose":
-        return ("propose", when)
+    if d.action in ("propose", "remind"):
+        return (d.action, when)
     if d.action == "change":
         return ("change", d.plan, when)
     return (d.action, d.plan)
