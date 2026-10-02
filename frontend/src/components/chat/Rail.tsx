@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, LogOut, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { AlertCircle, DoorOpen, LogOut, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useReminderStore } from "../../stores/reminderStore";
@@ -30,6 +30,7 @@ export default function Rail({ onNew, creating, createError, className }: Props)
     const listState = useChatStore((s) => s.listState);
     const load = useChatStore((s) => s.load);
     const remove = useChatStore((s) => s.remove);
+    const leave = useChatStore((s) => s.leave);
     const reset = useChatStore((s) => s.reset);
     const unread = useChatStore((s) => s.unread);
     const user = useAuthStore((s) => s.user);
@@ -59,7 +60,8 @@ export default function Rail({ onNew, creating, createError, className }: Props)
         return () => window.clearTimeout(timer);
     }, [armedId]);
 
-    const handleDelete = async (id: string) => {
+    /** Owners delete the conversation; everyone else leaves it. */
+    const handleDelete = async (id: string, owns: boolean) => {
         if (armedId !== id) {
             setArmedId(id);
             return;
@@ -68,10 +70,10 @@ export default function Rail({ onNew, creating, createError, className }: Props)
         setDeletingId(id);
         setDeleteError(null);
         try {
-            await remove(id);
+            await (owns ? remove(id) : leave(id));
             if (conversationId === id) navigate("/chat", { replace: true });
         } catch {
-            setDeleteError("That conversation wasn't deleted. Try again.");
+            setDeleteError(owns ? "That conversation wasn't deleted. Try again." : "You're still in that conversation. Try again.");
         } finally {
             setDeletingId(null);
         }
@@ -156,6 +158,8 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                                 const armed = armedId === convo.id;
                                 const deleting = deletingId === convo.id;
                                 const title = convo.title || "Untitled";
+                                const owns = !convo.owner_id || convo.owner_id === user?.id;
+                                const verb = owns ? "Delete" : "Leave";
                                 const fresh = unread[convo.id] && !active;
 
                                 return (
@@ -204,10 +208,10 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                                         </time>
                                         <button
                                             type="button"
-                                            onClick={() => void handleDelete(convo.id)}
+                                            onClick={() => void handleDelete(convo.id, owns)}
                                             onBlur={() => armed && setArmedId(null)}
                                             disabled={deletingId !== null}
-                                            aria-label={armed ? `Confirm delete ${title}` : `Delete ${title}`}
+                                            aria-label={armed ? `Confirm ${verb.toLowerCase()} ${title}` : `${verb} ${title}`}
                                             aria-busy={deleting}
                                             className={cn(
                                                 "btn btn-quiet absolute right-0 top-1/2 h-10 -translate-y-1/2 rounded-[10px] font-medium transition-[opacity,background-color,color] duration-200 focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100",
@@ -216,7 +220,7 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                                                     : "w-10 px-0 text-ink-4 opacity-0",
                                             )}
                                         >
-                                            {armed ? "Delete" : <Trash2 size={15} aria-hidden="true" />}
+                                            {armed ? verb : owns ? <Trash2 size={15} aria-hidden="true" /> : <DoorOpen size={15} aria-hidden="true" />}
                                         </button>
                                     </motion.li>
                                 );
