@@ -8,7 +8,7 @@ import Presence from "../ui/Presence";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 // The server decides when a reminder is due and pushes it on the app-wide socket;
-// polling only catches what a dropped socket missed. Closed tabs get email instead.
+// polling only catches what a dropped socket missed. Closed tabs get Web Push or email.
 const POLL_MS = 60_000;
 const CHECK_MS = 15_000;
 
