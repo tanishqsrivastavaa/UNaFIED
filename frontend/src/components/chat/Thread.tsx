@@ -9,7 +9,7 @@ import { useAuthStore } from "../../stores/authStore";
 import { useChatStore, type Peer, type Typing } from "../../stores/chatStore";
 import Presence from "../ui/Presence";
 import Composer from "./Composer";
-import Invite from "./Invite";
+import People from "./People";
 import { AgentMessage, HumanMessage } from "./Message";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -38,6 +38,7 @@ export default function Thread({ conversationId }: { conversationId: string }) {
     const me = useAuthStore((s) => s.user?.id);
     const status = useChatStore((s) => s.status[conversationId] ?? "connecting");
     const title = useChatStore((s) => s.conversations.find((c) => c.id === conversationId)?.title);
+    const removed = useChatStore((s) => s.removed[conversationId] ?? false);
     const openThread = useChatStore((s) => s.openThread);
     const closeThread = useChatStore((s) => s.closeThread);
     const loadThread = useChatStore((s) => s.loadThread);
@@ -174,7 +175,7 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                         <h1 className="truncate text-body font-medium tracking-[-0.012em] text-ink" title={heading}>
                             {heading || "\u00a0"}
                         </h1>
-                        {load === "ready" && people.length > 0 && (
+                        {load === "ready" && !removed && people.length > 0 && (
                             <p className="flex min-w-0 items-center gap-1 overflow-hidden text-meta text-ink-4" aria-live="polite">
                                 <span className="shrink-0">with</span>
                                 {people.map((person, i) => (
@@ -192,9 +193,9 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                             </p>
                         )}
                     </div>
-                    {load === "ready" && <Invite conversationId={conversationId} />}
+                    {load === "ready" && !removed && <People conversationId={conversationId} />}
                     {/* Said aloud always; shown only when the connection needs attention. */}
-                    {load === "ready" && (
+                    {load === "ready" && !removed && (
                         <p
                             role="status"
                             className={cn(
@@ -219,7 +220,17 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                     className={cn(MEASURE, "flex min-h-full flex-col justify-end pt-28")}
                     style={{ paddingBottom: "calc(var(--composer-h, 96px) + 12px)" }}
                 >
-                    {load === "loading" ? (
+                    {removed ? (
+                        <div role="status" className="my-auto max-w-[44ch]">
+                            <p className="text-lg font-medium text-ink">You&rsquo;re no longer in this conversation.</p>
+                            <p className="mt-2 text-body text-ink-3">
+                                It&rsquo;s off your list now. If that&rsquo;s a mistake, ask someone in it to add you back.
+                            </p>
+                            <Link to="/chat" className="btn btn-ghost mt-5">
+                                Back to conversations
+                            </Link>
+                        </div>
+                    ) : load === "loading" ? (
                         <motion.p
                             className="my-auto flex items-center justify-center gap-3 text-sm text-ink-3"
                             role="status"
@@ -317,7 +328,7 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                 </div>
             </div>
 
-            {load === "ready" && (
+            {load === "ready" && !removed && (
                 <motion.div
                     ref={composerRef}
                     className="absolute inset-x-0 bottom-0 z-10"
