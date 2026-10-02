@@ -6,7 +6,10 @@ from ...core.redis import get_redis
 from ...core.security import get_current_user
 from ...db.db import get_session
 from ...models.user import User
-from ...schemas.user import LoginRequest, UserCreate, UserRead
+from ...schemas.user import LoginRequest, UserCreate, UserRead, PreferencesRead, PreferencesUpdate
+from ...services.preferences import get_preferences
+from ...core.email import email_configured
+from ...core.clock import utcnow
 from ...crud.user import (
     create_user,
     authenticate_user,
@@ -82,3 +85,36 @@ async def update_my_timezone(
     session.add(current_user)
     session.commit()
     await redis.delete(f"user:{current_user.id}")  # chat routes cache the user for 5 minutes
+
+
+def _preferences_read(prefs) -> PreferencesRead:
+    return PreferencesRead(
+        reminder_lead_minutes=prefs.reminder_lead_minutes,
+        email_notifications=prefs.email_notifications,
+        email_available=email_configured(),
+    )
+
+
+@router.get("/me/preferences", response_model=PreferencesRead)
+def read_my_preferences(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    return _preferences_read(get_preferences(session, current_user.id))
+
+
+@router.patch("/me/preferences", response_model=PreferencesRead)
+def update_my_preferences(
+    changes: PreferencesUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    prefs = get_preferences(session, current_user.id)
+    for field, value in changes.model_dump(exclude_none=True).items():
+        setattr(prefs, field, value)
+    prefs.updated_at = utcnow()
+    session.add(prefs)
+    session.commit()
+    session.refresh(prefs)
+    return _preferences_read(prefs)
+

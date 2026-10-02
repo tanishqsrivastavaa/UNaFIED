@@ -1,6 +1,6 @@
 import uuid
 from sqlmodel import SQLModel
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 
@@ -20,3 +20,15 @@ class UserRead(BaseModel):
     id: uuid.UUID
     email: str
     timezone: str
+
+
+#Reminder settings; email_available says whether the server can send email at all
+class PreferencesRead(BaseModel):
+    reminder_lead_minutes: int
+    email_notifications: bool
+    email_available: bool
+
+
+class PreferencesUpdate(BaseModel):
+    reminder_lead_minutes: int | None = Field(default=None, ge=0, le=1440)
+    email_notifications: bool | None = None
