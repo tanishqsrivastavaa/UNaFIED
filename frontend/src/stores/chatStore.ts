@@ -6,6 +6,7 @@ import {
     getConversations,
     inviteParticipant,
     sendMessageStream,
+    startDirectChat,
     type Conversation,
     type Message,
     type Participant,
@@ -37,6 +38,8 @@ export interface Typing {
 }
 
 const NOT_SENT = "Your message didn't send, so it's back in the box.";
+/** Key of the app-wide socket among the per-conversation ones. */
+const APP_SOCKET = "app";
 const NO_REPLY = "UNaFIED didn't reply. Send a follow-up to try again.";
 
 export const freshConversations = new Set<string>();
@@ -66,6 +69,8 @@ interface ChatState {
     status: Record<string, SocketStatus>;
     typingSent: Record<string, boolean>;
     pending: Record<string, Pending | null>;
+    /** Conversations with new messages since they were last open. */
+    unread: Record<string, boolean>;
 
     load: () => Promise<void>;
     /** Creates a conversation and puts it at the top of the list. Throws on failure. */
@@ -82,6 +87,11 @@ interface ChatState {
     setTyping: (id: string, isTyping: boolean) => void;
     /** Adds someone by email. Throws with the server's reason on failure. */
     invite: (id: string, email: string) => Promise<void>;
+    /** Opens (or starts) your chat with one person. Throws with the server's reason on failure. */
+    direct: (email: string) => Promise<Conversation>;
+    /** Listens for what happens outside the open thread: activity elsewhere, new conversations, reminders. */
+    startAppSocket: () => void;
+    stopAppSocket: () => void;
     reset: () => void;
 }
 
@@ -297,11 +307,6 @@ export const useChatStore = create<ChatState>((set, get) => {
                 break;
             }
 
-            case "reminders_changed": {
-                void useReminderStore.getState().load();
-                break;
-            }
-
             case "socket_reconnected": {
                 const pending = get().pending[id];
                 if (pending) void reconcile(id, pending);
@@ -327,6 +332,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         status: {},
         typingSent: {},
         pending: {},
+        unread: {},
 
         load: async () => {
             if (get().conversations.length === 0) set({ listState: "loading" });
@@ -358,6 +364,7 @@ export const useChatStore = create<ChatState>((set, get) => {
 
         openThread: (id) => {
             active.add(id);
+            if (get().unread[id]) set((s) => ({ unread: { ...s.unread, [id]: false } }));
 
             const begin = () => {
                 if (!active.has(id)) return;
@@ -447,6 +454,44 @@ export const useChatStore = create<ChatState>((set, get) => {
             set((s) => ({ participants: { ...s.participants, [id]: withMember(s.participants[id], added) } }));
         },
 
+        direct: async (email) => {
+            const convo = await startDirectChat(email);
+            set((s) => ({ conversations: [convo, ...s.conversations.filter((c) => c.id !== convo.id)], listState: "ready" }));
+            return convo;
+        },
+
+        startAppSocket: () => {
+            const reminders = () => void useReminderStore.getState().load();
+            openSocket(
+                APP_SOCKET,
+                (event) => {
+                    switch (event.type) {
+                        case "conversation_activity": {
+                            const id = String(event.data.conversation_id);
+                            if (!active.has(id)) set((s) => ({ unread: { ...s.unread, [id]: true } }));
+                            void get().load(); // the list is ordered by latest activity
+                            break;
+                        }
+                        case "conversations_changed":
+                            void get().load();
+                            break;
+                        case "reminders_changed":
+                        case "reminder_due":
+                            reminders();
+                            break;
+                        case "socket_reconnected":
+                            void get().load();
+                            reminders();
+                            break;
+                    }
+                },
+                () => {},
+                "/ws",
+            );
+        },
+
+        stopAppSocket: () => closeSocket(APP_SOCKET),
+
         reset: () => {
             closeAllSockets();
             active.clear();
@@ -464,6 +509,7 @@ export const useChatStore = create<ChatState>((set, get) => {
                 status: {},
                 typingSent: {},
                 pending: {},
+                unread: {},
             });
         },
     };
