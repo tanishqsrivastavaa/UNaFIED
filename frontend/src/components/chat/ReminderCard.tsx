@@ -2,20 +2,41 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import type { Message } from "../../lib/api";
 import { serverDate, when } from "../../lib/time";
+import { useAuthStore } from "../../stores/authStore";
 import { useReminderStore } from "../../stores/reminderStore";
 import Presence from "../ui/Presence";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 type Suggestion = NonNullable<Message["suggestion"]>;
+type State = "set" | "waiting" | "removed" | "changed";
+
+const LABEL: Record<State, string> = {
+    set: "Reminder",
+    waiting: "Waiting for your yes",
+    removed: "Removed for you",
+    changed: "Plan changed since",
+};
+
+/** The one action each state offers: its text, its accessible name, and the status it sets. */
+const ACTION: Partial<Record<State, { text: string; name: string; status: "confirmed" | "dismissed" }>> = {
+    set: { text: "Undo", name: "Undo reminder", status: "dismissed" },
+    waiting: { text: "Count me in", name: "Count me in", status: "confirmed" },
+    removed: { text: "Restore", name: "Restore reminder", status: "confirmed" },
+};
 
 /**
  * What the assistant posts once people agree on a time. Each reader has their
- * own reminder for the plan, so Undo only takes it off their list.
+ * own reminder for the plan, so Undo only takes it off their list. In a group,
+ * whoever hasn't said yes yet holds a proposed one until they count themselves in.
+ * A personal reminder ("remind me to…") is one person's; everyone else just sees whose it is.
  */
 export default function ReminderCard({ suggestion }: { suggestion: Suggestion }) {
     const plan = String(suggestion.parameters.plan ?? "");
     const dueAt = String(suggestion.parameters.due_at ?? "");
+    const personalFor = String(suggestion.parameters.personal_for ?? "");
+    const personalName = String(suggestion.parameters.personal_name ?? "") || "someone else";
+    const me = useAuthStore((s) => s.user?.id);
     const mine = useReminderStore((s) => s.reminders.find((r) => r.message_id === plan));
     const loaded = useReminderStore((s) => s.loaded);
     const update = useReminderStore((s) => s.update);
@@ -24,14 +45,25 @@ export default function ReminderCard({ suggestion }: { suggestion: Suggestion })
     const [now] = useState(() => Date.now());
 
     const past = dueAt !== "" && serverDate(dueAt).getTime() < now;
-    const state = !loaded ? null : !mine ? "changed" : mine.status === "dismissed" ? "removed" : "set";
+    const forOther = personalFor !== "" && personalFor !== me;
+    const state: State | null =
+        forOther || !loaded
+            ? null
+            : !mine
+              ? "changed"
+              : mine.status === "dismissed"
+                ? "removed"
+                : mine.status === "proposed"
+                  ? "waiting"
+                  : "set";
+    const action = state && mine && !past ? ACTION[state] : undefined;
 
-    const toggle = async () => {
-        if (!mine) return;
+    const act = async () => {
+        if (!mine || !action) return;
         setBusy(true);
         setFailed(false);
         try {
-            await update(mine.id, { status: state === "removed" ? "confirmed" : "dismissed" });
+            await update(mine.id, { status: action.status });
         } catch {
             setFailed(true);
         } finally {
@@ -50,7 +82,7 @@ export default function ReminderCard({ suggestion }: { suggestion: Suggestion })
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-meta font-medium text-sage">
                     <Presence />
-                    {state === "removed" ? "Removed for you" : state === "changed" ? "Plan changed since" : "Reminder"}
+                    {forOther ? `Reminder for ${personalName}` : LABEL[state ?? "set"]}
                 </p>
                 <p className="mt-2 truncate text-body font-medium tracking-[-0.01em] text-ink">{suggestion.label}</p>
                 {dueAt && (
@@ -64,15 +96,15 @@ export default function ReminderCard({ suggestion }: { suggestion: Suggestion })
                     </p>
                 )}
             </div>
-            {mine && !past && (state === "set" || state === "removed") && (
+            {action && (
                 <button
                     type="button"
                     className="btn btn-quiet h-10 shrink-0 px-3.5 text-sm font-medium"
-                    onClick={() => void toggle()}
+                    onClick={() => void act()}
                     disabled={busy}
-                    aria-label={state === "removed" ? `Restore reminder: ${suggestion.label}` : `Undo reminder: ${suggestion.label}`}
+                    aria-label={`${action.name}: ${suggestion.label}`}
                 >
-                    {state === "removed" ? "Restore" : "Undo"}
+                    {action.text}
                 </button>
             )}
         </motion.section>
