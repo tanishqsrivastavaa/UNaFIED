@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_FROM: str | None = None
+    # Reminder alerts to closed tabs (Web Push); leave the keys unset to turn push off
+    VAPID_PUBLIC_KEY: str | None = None
+    VAPID_PRIVATE_KEY: str | None = None
+    # Push services contact this address about abuse; Safari rejects a localhost one
+    VAPID_SUBJECT: str = "mailto:unafied@localhost"
 
     class Config:
         env_file = ".env"
