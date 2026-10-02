@@ -7,8 +7,8 @@ import { useReminderStore } from "../../stores/reminderStore";
 import Presence from "../ui/Presence";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-// ponytail: polling plus in-tab checks only reach people with the app open.
-// Web Push or email is the upgrade when alerts must reach a closed tab.
+// The server decides when a reminder is due and pushes it on the app-wide socket;
+// polling only catches what a dropped socket missed. Closed tabs get email instead.
 const POLL_MS = 60_000;
 const CHECK_MS = 15_000;
 

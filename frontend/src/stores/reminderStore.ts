@@ -2,9 +2,7 @@ import { create } from "zustand";
 import { getReminders, updateReminder, type Reminder } from "../lib/api";
 import { serverDate } from "../lib/time";
 
-/** Alert this long before a reminder is due. */
-export const LEAD_MS = 15 * 60_000;
-/** Still worth alerting this late, e.g. when the app opens just after the lead time. */
+/** An alert still shows if the app opens up to this long after the reminder's time. */
 const GRACE_MS = 5 * 60_000;
 const ALERTED_KEY = "unafied:alerted";
 
@@ -38,7 +36,10 @@ interface ReminderState {
     load: () => Promise<void>;
     /** Throws on failure; the list is untouched then. */
     setStatus: (id: string, status: "confirmed" | "dismissed") => Promise<void>;
-    /** Raises an alert for each confirmed reminder that is now within the lead time. */
+    /**
+     * Raises an alert for each reminder the server has sent (at the person's lead time)
+     * that this browser hasn't shown yet, unless its time is long past.
+     */
     check: (now: number) => void;
     dismissAlert: (id: string) => void;
     reset: () => void;
@@ -70,7 +71,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
         syncAlerted();
         const due = get().reminders.filter((r) => {
             const at = serverDate(r.due_at).getTime();
-            return r.status === "confirmed" && !alerted.has(r.id) && now >= at - LEAD_MS && now <= at + GRACE_MS;
+            return r.status === "sent" && !alerted.has(r.id) && now <= at + GRACE_MS;
         });
         if (due.length === 0) return;
         syncAlerted(due.map((r) => r.id));

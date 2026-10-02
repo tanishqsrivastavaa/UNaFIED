@@ -28,7 +28,7 @@ export default function Reminders() {
     }, []);
 
     const upcoming = reminders.filter(
-        (r) => (r.status === "confirmed" || r.status === "proposed") && serverDate(r.due_at).getTime() > now - KEEP_MS,
+        (r) => r.status !== "dismissed" && serverDate(r.due_at).getTime() > now - KEEP_MS,
     );
     if (upcoming.length === 0) return null;
 
