@@ -8,6 +8,7 @@ import { useReminderStore } from "../../stores/reminderStore";
 import { ago } from "../../lib/time";
 import { cn } from "../../lib/cn";
 import { modKey } from "../../lib/platform";
+import { unsubscribe as unsubscribePush } from "../../lib/push";
 import Kbd from "../ui/Kbd";
 import Wordmark from "../ui/Wordmark";
 import Reminders from "./Reminders";
@@ -78,6 +79,8 @@ export default function Rail({ onNew, creating, createError, className }: Props)
 
     const handleSignOut = async () => {
         setLeaving(true);
+        // While still signed in, so the next person on this browser doesn't get these alerts.
+        await unsubscribePush().catch(() => {});
         await logout();
         reset();
         useReminderStore.getState().reset();
