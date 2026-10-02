@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Settings2 } from "lucide-react";
 import { getPreferences, updatePreferences, type Preferences } from "../../lib/api";
 import { cn } from "../../lib/cn";
+import { pushSupported, serverKey, subscribe, syncSubscription, unsubscribe } from "../../lib/push";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const LEADS: [number, string][] = [
@@ -16,11 +17,13 @@ const LEADS: [number, string][] = [
 
 type SaveState = "idle" | "saving" | "saved" | "failed";
 
-/** Rail footer control: when reminders alert you, and whether they email you too. */
+/** Rail footer control: when reminders alert you, and how they reach you when the app is closed. */
 export default function Settings() {
     const [open, setOpen] = useState(false);
     const [prefs, setPrefs] = useState<Preferences | null>(null);
     const [loadFailed, setLoadFailed] = useState(false);
+    // Push lives in this browser, not in preferences: the server's key, and whether this browser is subscribed.
+    const [push, setPush] = useState<{ key: string | null; on: boolean } | null>(null);
     const [save, setSave] = useState<SaveState>("idle");
     const buttonRef = useRef<HTMLButtonElement>(null);
     const id = useId();
@@ -31,6 +34,11 @@ export default function Settings() {
         getPreferences()
             .then((p) => live && setPrefs(p))
             .catch(() => live && setLoadFailed(true));
+        if (pushSupported) {
+            Promise.all([serverKey(), syncSubscription()])
+                .then(([key, on]) => live && setPush({ key, on }))
+                .catch(() => live && setPush({ key: null, on: false }));
+        }
         const onKey = (e: KeyboardEvent) => {
             if (e.key !== "Escape") return;
             setOpen(false);
@@ -53,6 +61,19 @@ export default function Settings() {
         }
     };
 
+    const changePush = async (on: boolean) => {
+        if (!push?.key) return;
+        setSave("saving");
+        try {
+            await (on ? subscribe(push.key) : unsubscribe());
+            setPush({ key: push.key, on });
+            setSave("saved");
+        } catch {
+            // A refusal is explained under the switch; anything else is worth another try.
+            setSave(Notification.permission === "denied" ? "idle" : "failed");
+        }
+    };
+
     const toggle = () => {
         setOpen((v) => !v);
         setLoadFailed(false);
@@ -63,6 +84,16 @@ export default function Settings() {
         prefs && !LEADS.some(([m]) => m === prefs.reminder_lead_minutes)
             ? [...LEADS, [prefs.reminder_lead_minutes, `${prefs.reminder_lead_minutes} minutes before`] as [number, string]]
             : LEADS;
+
+    const blocked = pushSupported && Notification.permission === "denied";
+    const pushReady = !!push?.key && !blocked;
+    const pushNote = !pushSupported
+        ? "This browser can’t alert you when the app is closed."
+        : push && !push.key
+          ? "Closed-app alerts aren’t set up on this server yet."
+          : blocked
+            ? "Notifications are blocked for this site in your browser settings."
+            : null;
 
     return (
         <>
@@ -116,6 +147,23 @@ export default function Settings() {
                                         </option>
                                     ))}
                                 </select>
+
+                                <label className={cn("mt-3 flex items-center gap-2.5 text-sm text-ink-2", !pushReady && "opacity-60")}>
+                                    <input
+                                        type="checkbox"
+                                        className="size-4 accent-[var(--color-bone)]"
+                                        checked={pushReady && !!push?.on}
+                                        disabled={!pushReady || save === "saving"}
+                                        onChange={(e) => void changePush(e.target.checked)}
+                                        aria-describedby={pushNote ? `${id}-push-note` : undefined}
+                                    />
+                                    Alert me when the app is closed
+                                </label>
+                                {pushNote && (
+                                    <p id={`${id}-push-note`} className="mt-1 pl-[26px] text-meta text-ink-4">
+                                        {pushNote}
+                                    </p>
+                                )}
 
                                 <label className={cn("mt-3 flex items-center gap-2.5 text-sm text-ink-2", !prefs.email_available && "opacity-60")}>
                                     <input
