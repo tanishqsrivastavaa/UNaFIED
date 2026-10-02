@@ -11,7 +11,7 @@
 
 </div>
 
-People chat with each other in real time. A **Listener** agent reads every message in a shared chat. When someone proposes a time ("let's meet at 4 pm today?") and someone else agrees ("sure, see you then"), it sets a reminder for everyone in the chat. It then posts a "Reminder set" card and alerts each person 15 minutes before.
+People chat with each other in real time: start a chat from someone's email, or add people to any conversation. A **Listener** agent reads every message in a shared chat. When someone proposes a time ("let's meet at 4 pm today?") and someone else agrees ("sure, see you then"), it sets a reminder for everyone in the chat. It then posts a "Reminder set" card and alerts each person ahead of time, 15 minutes before by default. People can change that lead time, and can turn on email.
 
 An assistant, **@unafied**, lives in every chat too. It answers every message when you chat with it alone. In a shared chat it stays quiet until someone mentions it.
 
@@ -26,13 +26,15 @@ flowchart LR
     D -->|someone else agrees| F[Reminder rows: confirmed<br/>+ 'Reminder set' card]
     D -->|change| E
     D -->|cancel| G[Reminder rows: dismissed]
-    F --> H[Browser alert 15 min before]
+    F --> H[Scheduler: due within your lead time]
+    H --> I[Alert on every open tab<br/>+ email if turned on]
 ```
 
 - **Plans need two people.** A proposal creates a `proposed` reminder for each person in the chat. It becomes `confirmed` only when someone other than the proposer agrees. Changing the time ("make it 5?") sends it back to `proposed` until the other person agrees again.
 - **Times are exact.** The model reads "4 pm today" in the sender's time zone, which the browser reports on sign-in, and answers in local time. The server converts that to UTC, and all timestamps are stored as `timestamptz`.
 - **Each person owns their reminder.** Undo on the card, or Remove in the reminders list, only affects your own copy.
 - **Replies never wait.** The Listener runs after the message is delivered, one message at a time per conversation.
+- **Alerts come from the server.** A scheduler checks every 30 seconds and claims each due reminder with one atomic update, so it fires once even with several servers. Because its state lives in the database, restarts lose nothing. Each person's open tabs share one app-wide socket, which also carries unread markers and new conversations.
 
 ## Stack
 
@@ -64,6 +66,7 @@ uv run uvicorn main:app --reload
 | `GEMINI_API_KEY` | Message embeddings |
 | `CORS_ORIGINS` | e.g. `http://localhost:5173` |
 | `DEBUG` | `true` or `false` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional. Set them to email reminders; leave `SMTP_HOST` unset to turn email off |
 
 **Frontend:**
 
@@ -83,7 +86,7 @@ docker compose up --build
 
 ```bash
 cd backend
-uv run pytest                          # API, reminders, and Listener rules (model stubbed)
+uv run pytest                          # API, sockets, permissions, scheduler, Listener rules (model stubbed)
 uv run python -m evals.listener_eval   # 43 labelled chats against the real model
 ```
 
@@ -95,6 +98,7 @@ The eval sends one request per case, one at a time, because Groq rate-limits bur
 backend/
   app/agents/listener_agent.py   what a message does to the chat's plans (pure, no database)
   app/services/listener.py       runs it in the background and applies the decision
+  app/services/scheduler.py      fires due reminders: alerts and email
   app/api/routes/reminders.py    list, confirm and dismiss your reminders
   app/api/websockets/            per-conversation sockets, Redis fan-out
   alembic/versions/              migrations
@@ -106,8 +110,8 @@ frontend/
 
 ## Known limits
 
-- **Alerts need the app open.** Alerts fire while the app is open in a tab. Reaching a closed tab needs Web Push or email.
-- **One server at a time.** The Listener keeps each conversation's messages in order on a single server. Running several servers needs a shared lock.
+- **Closed tabs need email.** With every tab closed, only email reaches you, and only when SMTP is set. Web Push would cover that.
+- **The Listener's ordering is per server.** It keeps each conversation's messages in order on a single server. Running several servers needs a shared lock. The scheduler is already safe across servers.
 - **One model call per message.** Every message in a shared chat costs one model call.
 
 ## License
