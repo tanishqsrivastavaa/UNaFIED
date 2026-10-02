@@ -187,7 +187,7 @@ export default function Thread({ conversationId }: { conversationId: string }) {
                                                 <span className="sr-only">(here now)</span>
                                             </>
                                         )}
-                                        {i < people.length - 1 && <span aria-hidden="true">,</span>}
+                                        {i < people.length - 1 && <span aria-hidden="true" className="-ml-1.5">,</span>}
                                     </span>
                                 ))}
                             </p>
