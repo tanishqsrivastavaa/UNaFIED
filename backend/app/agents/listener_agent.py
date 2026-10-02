@@ -1,7 +1,8 @@
 """
 The Listener reads the newest message in a human conversation and says what it
 does to the plans in that chat: proposes one, agrees to one, changes, cancels,
-or nothing. It never touches the database; services/listener.py applies it.
+sets a personal reminder, or nothing. It never touches the database;
+services/listener.py applies it.
 """
 
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from ..config.settings import settings
 
 
 class ListenerDecision(BaseModel):
-    action: Literal["none", "propose", "agree", "change", "cancel"]
+    action: Literal["none", "propose", "agree", "change", "cancel", "remind"]
     plan: Optional[int] = Field(
         default=None,
         description="Required for agree, change and cancel: the number of the pending plan (1, 2, ...).",
@@ -41,8 +42,9 @@ class Line:
 class Plan:
     title: str
     at: datetime  # local time of the reader
-    proposer: str
+    proposer: str  # for a personal plan, the one person it is for
     agreed: bool
+    personal: bool = False
 
 
 PROMPT = """\
@@ -53,9 +55,13 @@ Decide what the NEWEST message does. Earlier messages are only context. Pick exa
 - agree: accepts a pending plan that SOMEONE ELSE proposed ("sure", "sounds good", "see you then", "yes 4 works"). Give plan.
 - change: moves or edits a pending plan ("can we make it 5 instead?", "let's do Friday at 6 instead"). Give plan, plus when and/or title.
 - cancel: declines or calls off a pending plan ("can't make it", "let's skip it"). Give plan.
+- remind: the sender asks to be reminded of something at a time you can pin down ("remind me to call mom at 6", "remind me tomorrow at 9 to send the deck", "ping me in 20 minutes to check the oven"). Give title and when. It is only for the sender, so nobody has to agree. Use it even when the chat has one person.
 
 For agree, change and cancel, always set plan to that plan's number from the "Pending plans" list, even when there is only one.
 - none: anything else: small talk, past events, plans with no time ("we should hang out sometime"), or someone repeating their own plan.
+  Also none: "remind me" with no time ("remind me later"), asking to recall something ("remind me what we said?"), and reminding someone else ("I'll remind him").
+
+Personal plans (marked "personal, for NAME") are one person's own reminders. That person changes or cancels them with change or cancel ("actually make it 7", "cancel that reminder"). Nobody agrees to them.
 
 Times:
 - "today", "tomorrow" and weekdays count from Now. A clock time with no day means the next time that clock time comes.
@@ -85,8 +91,11 @@ def render(now: datetime, zone: str, plans: list[Plan], lines: list[Line]) -> st
     """The context the model sees. Every time is in the newest sender's zone."""
     out = [f"Now: {now.strftime('%A %Y-%m-%d %H:%M')} ({zone})", "", "Pending plans:"]
     for i, p in enumerate(plans, 1):
-        state = "agreed" if p.agreed else "waiting for agreement"
-        out.append(f"{i}. \"{p.title}\" at {_clock(p.at)}, proposed by {p.proposer}, {state}")
+        if p.personal:
+            state = f"personal, for {p.proposer}"
+        else:
+            state = f"proposed by {p.proposer}, " + ("agreed" if p.agreed else "waiting for agreement")
+        out.append(f"{i}. \"{p.title}\" at {_clock(p.at)}, {state}")
     if not plans:
         out.append("(none)")
     out += ["", "Messages, oldest first:"]
