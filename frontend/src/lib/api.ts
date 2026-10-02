@@ -181,6 +181,14 @@ export async function getConversationDetail(id: string) {
     return apiFetch<Conversation & { messages: Message[]; participants: Participant[] }>(`/chats/${id}`);
 }
 
+/** Your chat with the person behind an email; the server reuses the one you already have. */
+export async function startDirectChat(email: string) {
+    return apiFetch<Conversation>("/chats/direct", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+    });
+}
+
 /* ── Participants ── */
 
 export interface Participant {
@@ -264,6 +272,27 @@ export async function getReminders() {
 
 export async function updateReminder(id: string, changes: { status?: "confirmed" | "dismissed" }) {
     return apiFetch<Reminder>(`/reminders/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(changes),
+    });
+}
+
+/* ── Settings ── */
+
+export interface Preferences {
+    /** Minutes before a reminder's time that its alert goes out. */
+    reminder_lead_minutes: number;
+    email_notifications: boolean;
+    /** False when the server has no email set up, so the email switch can't do anything. */
+    email_available: boolean;
+}
+
+export async function getPreferences() {
+    return apiFetch<Preferences>("/me/preferences");
+}
+
+export async function updatePreferences(changes: Partial<Pick<Preferences, "reminder_lead_minutes" | "email_notifications">>) {
+    return apiFetch<Preferences>("/me/preferences", {
         method: "PATCH",
         body: JSON.stringify(changes),
     });
