@@ -9,6 +9,7 @@ import Rail from "../components/chat/Rail";
 import Thread from "../components/chat/Thread";
 import Lobby from "../components/chat/Lobby";
 import Alerts from "../components/chat/Alerts";
+import { pushSupported, syncSubscription } from "../lib/push";
 
 export default function ChatPage() {
     const { conversationId } = useParams();
@@ -32,6 +33,11 @@ export default function ChatPage() {
             setCreating(false);
         }
     }, [create, creating, navigate]);
+
+    // A shared browser's closed-app alerts follow whoever is signed in now
+    useEffect(() => {
+        if (pushSupported) void syncSubscription().catch(() => undefined);
+    }, []);
 
     // News from outside the open thread: activity elsewhere, new chats, reminders
     useEffect(() => {
