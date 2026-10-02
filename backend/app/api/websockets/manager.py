@@ -27,6 +27,8 @@ class ConnectionManager:
     def __init__(self):
         # conversation_id -> {user_id: {WebSocket, ...}}  (a user can have several tabs open)
         self.active_connections: Dict[uuid.UUID, Dict[uuid.UUID, Set[WebSocket]]] = {}
+        # user_id -> {WebSocket, ...}: one per open app tab, for events outside any thread
+        self.user_connections: Dict[uuid.UUID, Set[WebSocket]] = {}
         self.redis_pubsub: RedisPubSubManager | None = None
         self.instance_id = str(uuid.uuid4())
 
@@ -156,6 +158,50 @@ class ConnectionManager:
                 logger.error(f"Failed to send to user {user_id}: {e}")
                 await self.disconnect(conversation_id, user_id, websocket)
 
+    async def connect_user(self, websocket: WebSocket, user_id: uuid.UUID):
+        """Accept a person's app-wide socket."""
+        await websocket.accept()
+        if user_id not in self.user_connections:
+            self.user_connections[user_id] = set()
+            if self.redis_pubsub:
+                await self.redis_pubsub.subscribe(
+                    f"user:{user_id}",
+                    lambda data: self._handle_user_redis_message(user_id, data),
+                )
+        self.user_connections[user_id].add(websocket)
+
+    async def disconnect_user(self, user_id: uuid.UUID, websocket: WebSocket):
+        sockets = self.user_connections.get(user_id)
+        if not sockets or websocket not in sockets:
+            return
+        sockets.discard(websocket)
+        if not sockets:
+            del self.user_connections[user_id]
+            if self.redis_pubsub:
+                await self.redis_pubsub.unsubscribe(f"user:{user_id}")
+
+    async def notify_user(self, user_id: uuid.UUID, message: dict):
+        """Send an event to every open tab of one person, on any server."""
+        if self.redis_pubsub:
+            await self.redis_pubsub.publish(f"user:{user_id}", {**message, "origin": self.instance_id})
+        await self._send_user_local(user_id, message)
+
+    async def _handle_user_redis_message(self, user_id: uuid.UUID, data: dict):
+        if data.pop("origin", None) == self.instance_id:
+            return
+        await self._send_user_local(user_id, data)
+
+    async def _send_user_local(self, user_id: uuid.UUID, message: dict):
+        failed = []
+        for websocket in list(self.user_connections.get(user_id, ())):
+            try:
+                await websocket.send_json(message)
+            except Exception as e:
+                logger.error(f"Failed to send to user {user_id}: {e}")
+                failed.append(websocket)
+        for websocket in failed:
+            await self.disconnect_user(user_id, websocket)
+
     def is_user_connected(self, conversation_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """Check if a user is connected to a conversation"""
         return bool(self.active_connections.get(conversation_id, {}).get(user_id))
@@ -171,6 +217,14 @@ class ConnectionManager:
                         pass
 
         self.active_connections.clear()
+
+        for sockets in list(self.user_connections.values()):
+            for websocket in list(sockets):
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+        self.user_connections.clear()
 
         if self.redis_pubsub:
             await self.redis_pubsub.close_all()
