@@ -12,6 +12,8 @@ export interface ServerEvent {
 }
 
 interface Entry {
+    /** Server path after /api/v1, e.g. /chats/<id>/ws, or /ws for the app-wide socket. */
+    path: string;
     socket: WebSocket | null;
     onMessage: (event: ServerEvent) => void;
     onStatus: (status: SocketStatus) => void;
@@ -50,7 +52,7 @@ function connect(id: string, entry: Entry) {
 
     entry.onStatus("connecting");
 
-    const socket = new WebSocket(`${WS_BASE}/chats/${id}/ws?token=${encodeURIComponent(token)}`);
+    const socket = new WebSocket(`${WS_BASE}${entry.path}?token=${encodeURIComponent(token)}`);
     entry.socket = socket;
 
     socket.onopen = () => {
@@ -81,10 +83,11 @@ function connect(id: string, entry: Entry) {
 export function openSocket(
     id: string,
     onMessage: (event: ServerEvent) => void,
-    onStatus: (status: SocketStatus) => void
+    onStatus: (status: SocketStatus) => void,
+    path = `/chats/${id}/ws`,
 ) {
     closeSocket(id);
-    const entry: Entry = { socket: null, onMessage, onStatus, attempts: 0, timer: null, closed: false };
+    const entry: Entry = { path, socket: null, onMessage, onStatus, attempts: 0, timer: null, closed: false };
     entries.set(id, entry);
     connect(id, entry);
 }
