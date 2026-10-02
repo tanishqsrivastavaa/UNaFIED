@@ -76,7 +76,22 @@ npm install
 npm run dev   # http://localhost:5173, talks to http://localhost:8000
 ```
 
-**Everything in Docker** (its own Postgres and Redis; secrets still come from `backend/.env`):
+**Reminder emails through Gmail.** Use Gmail's own mail server with an app password. You don't need Google OAuth for this; Gmail API tokens from an unreviewed app expire every 7 days.
+
+1. Turn on 2-Step Verification for the sending Google account, then create an app password at https://myaccount.google.com/apppasswords.
+2. Add to `backend/.env`:
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASSWORD=your-16-character-app-password
+SMTP_FROM=you@gmail.com
+```
+
+Each person still chooses "Email me too" in their reminder settings.
+
+**Everything in Docker** (its own Postgres, Redis and Mailpit; secrets still come from `backend/.env`). Reminder emails land in Mailpit at http://localhost:8025 instead of real inboxes:
 
 ```bash
 docker compose up --build
