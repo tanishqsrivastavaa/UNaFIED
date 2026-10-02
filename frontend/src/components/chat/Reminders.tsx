@@ -16,7 +16,7 @@ function canNotify() {
 /** Upcoming plans in the rail. Hidden entirely while there are none. */
 export default function Reminders() {
     const reminders = useReminderStore((s) => s.reminders);
-    const setStatus = useReminderStore((s) => s.setStatus);
+    const update = useReminderStore((s) => s.update);
     const [now, setNow] = useState(() => Date.now());
     const [askable, setAskable] = useState(canNotify);
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export default function Reminders() {
         setBusyId(reminder.id);
         setFailed(false);
         try {
-            await setStatus(reminder.id, status);
+            await update(reminder.id, { status });
         } catch {
             setFailed(true);
         } finally {

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { getReminders, updateReminder, type Reminder } from "../lib/api";
+import { getReminders, updateReminder, type Reminder, type ReminderChanges } from "../lib/api";
 import { serverDate } from "../lib/time";
 
 /** An alert still shows if the app opens up to this long after the reminder's time. */
@@ -8,6 +8,8 @@ const ALERTED_KEY = "unafied:alerted";
 
 /** Reminders already alerted. Kept in memory too, so blocked storage can't cause repeats. */
 const alerted = new Set<string>();
+
+const byTime = (a: Reminder, b: Reminder) => serverDate(a.due_at).getTime() - serverDate(b.due_at).getTime();
 
 function syncAlerted(add: string[] = []) {
     try {
@@ -35,7 +37,7 @@ interface ReminderState {
     alerts: Reminder[];
     load: () => Promise<void>;
     /** Throws on failure; the list is untouched then. */
-    setStatus: (id: string, status: "confirmed" | "dismissed") => Promise<void>;
+    update: (id: string, changes: ReminderChanges) => Promise<void>;
     /**
      * Raises an alert for each reminder the server has sent (at the person's lead time)
      * that this browser hasn't shown yet, unless its time is long past.
@@ -59,11 +61,12 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
         }
     },
 
-    setStatus: async (id, status) => {
-        const updated = await updateReminder(id, { status });
+    update: async (id, changes) => {
+        const updated = await updateReminder(id, changes);
         set((s) => ({
-            reminders: s.reminders.map((r) => (r.id === id ? updated : r)),
-            alerts: status === "dismissed" ? s.alerts.filter((a) => a.id !== id) : s.alerts,
+            reminders: s.reminders.map((r) => (r.id === id ? updated : r)).sort(byTime),
+            // An alert only stands while its reminder is still sent: removing or moving it clears the alert.
+            alerts: s.alerts.flatMap((a) => (a.id !== id ? [a] : updated.status === "sent" ? [updated] : [])),
         }));
     },
 

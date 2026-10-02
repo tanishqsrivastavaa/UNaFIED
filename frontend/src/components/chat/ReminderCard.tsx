@@ -18,7 +18,7 @@ export default function ReminderCard({ suggestion }: { suggestion: Suggestion })
     const dueAt = String(suggestion.parameters.due_at ?? "");
     const mine = useReminderStore((s) => s.reminders.find((r) => r.message_id === plan));
     const loaded = useReminderStore((s) => s.loaded);
-    const setStatus = useReminderStore((s) => s.setStatus);
+    const update = useReminderStore((s) => s.update);
     const [busy, setBusy] = useState(false);
     const [failed, setFailed] = useState(false);
     const [now] = useState(() => Date.now());
@@ -31,7 +31,7 @@ export default function ReminderCard({ suggestion }: { suggestion: Suggestion })
         setBusy(true);
         setFailed(false);
         try {
-            await setStatus(mine.id, state === "removed" ? "confirmed" : "dismissed");
+            await update(mine.id, { status: state === "removed" ? "confirmed" : "dismissed" });
         } catch {
             setFailed(true);
         } finally {

@@ -270,7 +270,14 @@ export async function getReminders() {
     return apiFetch<Reminder[]>("/reminders/");
 }
 
-export async function updateReminder(id: string, changes: { status?: "confirmed" | "dismissed" }) {
+/** `due_at` must carry a zone (Z or an offset); the server rejects a bare local time. */
+export interface ReminderChanges {
+    title?: string;
+    due_at?: string;
+    status?: "confirmed" | "dismissed";
+}
+
+export async function updateReminder(id: string, changes: ReminderChanges) {
     return apiFetch<Reminder>(`/reminders/${id}`, {
         method: "PATCH",
         body: JSON.stringify(changes),
