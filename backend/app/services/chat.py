@@ -206,6 +206,7 @@ class ChatService:
         )
 
         session.add(user_message)
+        session.get(Conversation, conversation_id).updated_at = utcnow()
         session.commit()
         session.refresh(user_message)
         listener.watch(conversation_id, user_message.id)
@@ -339,6 +340,7 @@ class ChatService:
         )
 
         session.add(user_message)
+        session.get(Conversation, conversation_id).updated_at = utcnow()
         session.commit()
         session.refresh(user_message)
         listener.watch(conversation_id, user_message.id)
@@ -625,6 +627,17 @@ class ChatService:
             ],
             "participants": participants,
         }
+
+    @staticmethod
+    def active_member_ids(session: Session, conversation_id: uuid.UUID) -> list[uuid.UUID]:
+        return list(
+            session.exec(
+                select(ConversationParticipant.user_id).where(
+                    ConversationParticipant.conversation_id == conversation_id,
+                    ConversationParticipant.is_active == True,
+                )
+            ).all()
+        )
 
     @staticmethod
     def assistant_should_reply(

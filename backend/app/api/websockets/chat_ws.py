@@ -21,6 +21,7 @@ from app.services.chat import ChatService, SessionFactory
 from app.services import listener
 from app.schemas.chat import MessageCreate
 from app.core.logger import logger
+from app.core.clock import utcnow
 
 
 router = APIRouter()
@@ -229,6 +230,7 @@ async def handle_chat_message(
         assistant_replies = ChatService.assistant_should_reply(
             s, conversation_id, content
         )
+        members = ChatService.active_member_ids(s, conversation_id)
     if not can_send:
         await websocket.send_json(
             {
@@ -241,7 +243,7 @@ async def handle_chat_message(
 
     try:
         # Save user message to DB
-        from app.models.chats import Message
+        from app.models.chats import Conversation, Message
 
         with sessions() as s:
             user_message = Message(
@@ -251,6 +253,8 @@ async def handle_chat_message(
                 content=content,
             )
             s.add(user_message)
+            # Moves the conversation to the top of everyone's list
+            s.get(Conversation, conversation_id).updated_at = utcnow()
             s.commit()
             s.refresh(user_message)
             message_id = user_message.id
@@ -275,6 +279,18 @@ async def handle_chat_message(
             },
         )
         listener.watch(conversation_id, message_id)
+
+        # People not looking at this thread see it rise in their list, marked unread
+        for member in members:
+            if member != user_id:
+                await manager.notify_user(
+                    member,
+                    {
+                        "type": "conversation_activity",
+                        "data": {"conversation_id": str(conversation_id)},
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
 
         if not assistant_replies:
             return
