@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str
     DEBUG: str
     LOG_LEVEL: str | None = None
+    # Reminder emails; leave SMTP_HOST unset to turn email off
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM: str | None = None
 
     class Config:
         env_file = ".env"
