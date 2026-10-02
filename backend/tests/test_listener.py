@@ -1,7 +1,8 @@
 """
 Tests for applying Listener decisions (the model is stubbed): a plan becomes a
-reminder for everyone in the chat, and is confirmed only when someone other
-than its proposer agrees.
+reminder for everyone in the chat, and each person's is confirmed when they say
+yes (the proposer's with the first yes). "Remind me" sets one for its sender
+only, in any chat.
 """
 
 import uuid
@@ -26,14 +27,16 @@ def chat(monkeypatch):
     tables = [m.__table__ for m in (User, Conversation, ConversationParticipant, Message, Reminder)]
     SQLModel.metadata.create_all(engine, tables=tables)
 
-    sam, manish, convo = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    sam, manish, lee, convo = uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     with Session(engine) as s:
         s.add_all([
             User(id=sam, email="sam@x.io", timezone="Asia/Kolkata"),
             User(id=manish, email="manish@x.io"),  # UTC
+            User(id=lee, email="lee@x.io"),  # UTC
             Conversation(id=convo, owner_id=sam),
             ConversationParticipant(conversation_id=convo, user_id=sam, role="owner"),
             ConversationParticipant(conversation_id=convo, user_id=manish),
+            ConversationParticipant(conversation_id=convo, user_id=lee, is_active=False),  # join(lee) for a group
         ])
         s.commit()
 
@@ -73,12 +76,15 @@ def chat(monkeypatch):
         with Session(engine) as s:
             return s.exec(select(Message).where(Message.role == "assistant")).all()
 
-    def leave(user_id):
+    def leave(user_id, active=False):
         with Session(engine) as s:
             p = s.exec(select(ConversationParticipant).where(ConversationParticipant.user_id == user_id)).one()
-            p.is_active = False
+            p.is_active = active
             s.add(p)
             s.commit()
+
+    def join(user_id):
+        leave(user_id, active=True)
 
     def set_all(status):
         with Session(engine) as s:
@@ -87,12 +93,12 @@ def chat(monkeypatch):
                 s.add(r)
             s.commit()
 
-    return sam, manish, say, rows, seen, leave, acks, events, set_all
+    return sam, manish, say, rows, seen, leave, acks, events, set_all, lee, join
 
 
 @pytest.mark.asyncio
 async def test_plan_waits_for_the_other_person(chat):
-    sam, manish, say, rows, seen, _, acks, events, set_all = chat
+    sam, manish, say, rows, seen, _, acks, events, set_all, *_ = chat
 
     await say(sam, "coffee at 4?", D(action="propose", title="Coffee", when=datetime(2030, 1, 1, 16, 0)))
     assert len(rows()) == 2 and {r.status for r in rows()} == {"proposed"}
@@ -141,7 +147,7 @@ async def test_plan_waits_for_the_other_person(chat):
 
 @pytest.mark.asyncio
 async def test_ignores_past_repeated_and_unknown_plans(chat):
-    sam, manish, say, rows, _, _, acks, events, _ = chat
+    sam, manish, say, rows, _, _, acks, events, *_ = chat
 
     await say(sam, "yesterday at 4", D(action="propose", title="Coffee", when=datetime(2020, 1, 1, 16, 0)))
     assert rows() == []
@@ -156,8 +162,124 @@ async def test_ignores_past_repeated_and_unknown_plans(chat):
 
 
 @pytest.mark.asyncio
-async def test_solo_chat_is_left_alone(chat):
-    sam, manish, say, rows, seen, leave, acks, events, _ = chat
+async def test_solo_chat_only_takes_personal_reminders(chat):
+    sam, manish, say, rows, seen, leave, acks, events, *_ = chat
     leave(manish)
-    await say(sam, "remind me, dentist at 4", D(action="propose", title="Dentist", when=datetime(2030, 1, 1, 16, 0)))
-    assert rows() == [] and seen == [] and events == []
+    await say(sam, "dentist at 4", D(action="propose", title="Dentist", when=datetime(2030, 1, 1, 16, 0)))
+    assert rows() == [] and len(seen) == 1 and events == []
+
+
+@pytest.mark.asyncio
+async def test_two_people_cancel_calls_it_off(chat):
+    sam, manish, say, rows, _, _, acks, *_ = chat
+    await say(sam, "coffee at 4?", D(action="propose", title="Coffee", when=datetime(2030, 1, 1, 16, 0)))
+    await say(manish, "can't make it", D(action="cancel", plan=1))
+    assert [r.status for r in rows()] == ["dismissed", "dismissed"] and acks() == []
+
+
+@pytest.mark.asyncio
+async def test_personal_reminder_in_a_solo_chat(chat):
+    sam, manish, say, rows, seen, leave, acks, events, set_all, *_ = chat
+    leave(manish)
+
+    await say(sam, "remind me to call mom at 6", D(action="remind", title="Call mom", when=datetime(2030, 1, 1, 18, 0)))
+    [r] = rows()
+    # Only Sam's, set straight away; 6 pm in Kolkata is 12:30 UTC
+    assert (r.user_id, r.status, r.due_at.strftime("%H:%M")) == (sam, "confirmed", "12:30")
+    [ack] = acks()
+    assert ack.content == "Reminder set for you."
+    assert ack.suggestion["label"] == "Call mom" and ack.suggestion["tool_name"] == "reminder"
+    params = ack.suggestion["parameters"]
+    assert (params["plan"], params["personal_for"], params["personal_name"]) == (str(r.message_id), str(sam), "sam")
+    assert params["due_at"].startswith("2030-01-01T12:30")
+    assert [(e["type"], e.get("to")) for e in events] == [("message", None), ("reminders_changed", sam)]
+
+    # The same ask again is not a second reminder
+    await say(sam, "remind me to call mom at 6!", D(action="remind", title="call mom", when=datetime(2030, 1, 1, 18, 0)))
+    assert len(rows()) == 1 and len(acks()) == 1
+
+    # Moving it keeps it set, and re-arms one whose alert already went out
+    set_all("sent")
+    await say(sam, "actually make it 7", D(action="change", plan=1, when=datetime(2030, 1, 1, 19, 0)))
+    plan = seen[-1][1][0]
+    assert plan.personal and plan.proposer == "sam"
+    [r] = rows()
+    assert (r.status, r.due_at.strftime("%H:%M")) == ("confirmed", "13:30")
+    assert len(acks()) == 1 and events[-1] == {**events[-1], "type": "reminders_changed", "to": sam}
+
+    await say(sam, "cancel that reminder", D(action="cancel", plan=1))
+    assert rows()[0].status == "dismissed" and events[-1]["to"] == sam
+
+
+@pytest.mark.asyncio
+async def test_personal_reminder_is_only_its_owners(chat):
+    sam, manish, say, rows, seen, _, acks, events, *_ = chat
+    nine = datetime(2030, 1, 2, 9, 0)
+
+    await say(sam, "remind me tomorrow at 9 to send the deck", D(action="remind", title="Send the deck", when=nine))
+    [r] = rows()
+    assert r.user_id == sam and r.status == "confirmed"
+    assert acks()[0].suggestion["parameters"]["personal_for"] == str(sam)
+
+    sent = len(events)
+    await say(manish, "sure", D(action="agree", plan=1))
+    await say(manish, "make it 10", D(action="change", plan=1, when=datetime(2030, 1, 2, 10, 0)))
+    await say(manish, "nah cancel it", D(action="cancel", plan=1))
+    assert [(x.user_id, x.status, x.due_at) for x in rows()] == [(r.user_id, r.status, r.due_at)]
+    assert len(events) == sent and len(acks()) == 1
+    assert seen[-1][1][0].personal and seen[-1][1][0].proposer == "sam"
+
+    # A shared plan at the same moment is still a new plan (9:00 Kolkata is 03:30 UTC)
+    await say(manish, "call at 3:30?", D(action="propose", title="Call", when=datetime(2030, 1, 2, 3, 30)))
+    assert len(rows()) == 3
+
+
+@pytest.mark.asyncio
+async def test_group_agreement_is_per_person(chat):
+    sam, manish, say, rows, seen, _, acks, events, _, lee, join = chat
+    join(lee)
+
+    def status(title):
+        return {r.user_id: r.status for r in rows() if r.title == title}
+
+    await say(sam, "lunch at 1?", D(action="propose", title="Lunch", when=datetime(2030, 1, 1, 13, 0)))
+    assert status("Lunch") == {sam: "proposed", manish: "proposed", lee: "proposed"}
+
+    # The first yes sets it for the agreer and the proposer, and posts the card once
+    await say(manish, "I'm in", D(action="agree", plan=1))
+    assert status("Lunch") == {sam: "confirmed", manish: "confirmed", lee: "proposed"}
+    [ack] = acks()
+    assert ack.content == "Reminder set for everyone who said yes."
+    assert [e["type"] for e in events[-3:]] == ["message", "reminders_changed", "reminders_changed"]
+    assert {e["to"] for e in events[-2:]} == {sam, manish}
+
+    # A later yes adds only that person, with no new card
+    sent = len(events)
+    await say(lee, "me too", D(action="agree", plan=1))
+    assert status("Lunch") == {sam: "confirmed", manish: "confirmed", lee: "confirmed"}
+    assert len(acks()) == 1 and events[sent:] == [{**events[sent], "type": "reminders_changed", "to": lee}]
+
+    # A non-proposer backing out drops only their own; they can still come back
+    await say(lee, "actually I can't", D(action="cancel", plan=1))
+    assert status("Lunch") == {sam: "confirmed", manish: "confirmed", lee: "dismissed"}
+    await say(lee, "wait, I can after all", D(action="agree", plan=1))
+    assert status("Lunch") == {sam: "confirmed", manish: "confirmed", lee: "confirmed"} and len(acks()) == 1
+
+    # A change moves everyone's to the changer and needs fresh agreement
+    await say(manish, "make it 2?", D(action="change", plan=1, when=datetime(2030, 1, 1, 14, 0)))
+    assert status("Lunch") == {sam: "proposed", manish: "proposed", lee: "proposed"}
+    await say(sam, "2 works", D(action="agree", plan=1))
+    assert status("Lunch") == {sam: "confirmed", manish: "confirmed", lee: "proposed"} and len(acks()) == 2
+    assert not seen[-1][1][0].personal
+
+    # Once nobody but the proposer (now Manish) is left in, it's off for him too
+    await say(lee, "can't do 2", D(action="cancel", plan=1))
+    assert status("Lunch") == {sam: "confirmed", manish: "confirmed", lee: "dismissed"}
+    await say(sam, "me neither, sorry", D(action="cancel", plan=1))
+    assert set(status("Lunch").values()) == {"dismissed"}
+
+    # The proposer calling it off ends it for everyone
+    await say(sam, "dinner at 8?", D(action="propose", title="Dinner", when=datetime(2030, 1, 1, 20, 0)))
+    await say(manish, "yes", D(action="agree", plan=1))
+    await say(sam, "let's skip dinner", D(action="cancel", plan=1))
+    assert set(status("Dinner").values()) == {"dismissed"}
