@@ -11,6 +11,8 @@ import { modKey } from "../../lib/platform";
 import Kbd from "../ui/Kbd";
 import Wordmark from "../ui/Wordmark";
 import Reminders from "./Reminders";
+import DirectChat from "./DirectChat";
+import Settings from "./Settings";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const DISARM_MS = 3000;
@@ -28,6 +30,7 @@ export default function Rail({ onNew, creating, createError, className }: Props)
     const load = useChatStore((s) => s.load);
     const remove = useChatStore((s) => s.remove);
     const reset = useChatStore((s) => s.reset);
+    const unread = useChatStore((s) => s.unread);
     const user = useAuthStore((s) => s.user);
     const logout = useAuthStore((s) => s.logout);
     const { conversationId } = useParams();
@@ -96,7 +99,7 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                 <Wordmark />
             </div>
 
-            <div className="shrink-0 px-3 pt-2">
+            <div className="shrink-0 space-y-px px-3 pt-2">
                 <button
                     type="button"
                     onClick={onNew}
@@ -110,6 +113,7 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                         {modKey} K
                     </Kbd>
                 </button>
+                <DirectChat />
             </div>
 
             <Reminders />
@@ -149,6 +153,7 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                                 const armed = armedId === convo.id;
                                 const deleting = deletingId === convo.id;
                                 const title = convo.title || "Untitled";
+                                const fresh = unread[convo.id] && !active;
 
                                 return (
                                     <motion.li
@@ -177,7 +182,13 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                                                 armed && "pr-[88px]",
                                             )}
                                         >
-                                            <span className="truncate">{title}</span>
+                                            <span className={cn("truncate", fresh && "font-medium text-ink")}>{title}</span>
+                                            {fresh && (
+                                                <>
+                                                    <span aria-hidden="true" className="ml-2 size-1.5 shrink-0 rounded-full bg-ink-2" />
+                                                    <span className="sr-only">(new messages)</span>
+                                                </>
+                                            )}
                                         </Link>
                                         <time
                                             dateTime={convo.updated_at}
@@ -228,10 +239,11 @@ export default function Rail({ onNew, creating, createError, className }: Props)
                 )}
             </AnimatePresence>
 
-            <footer className="flex shrink-0 items-center gap-2 py-3 pl-6 pr-3">
+            <footer className="relative flex shrink-0 items-center gap-1 py-3 pl-6 pr-3">
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-4" title={email}>
                     {email}
                 </span>
+                <Settings />
                 <button
                     type="button"
                     onClick={() => void handleSignOut()}

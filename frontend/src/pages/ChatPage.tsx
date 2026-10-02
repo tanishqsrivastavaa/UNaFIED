@@ -14,6 +14,8 @@ export default function ChatPage() {
     const { conversationId } = useParams();
     const navigate = useNavigate();
     const create = useChatStore((s) => s.create);
+    const startAppSocket = useChatStore((s) => s.startAppSocket);
+    const stopAppSocket = useChatStore((s) => s.stopAppSocket);
     const [creating, setCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
 
@@ -30,6 +32,12 @@ export default function ChatPage() {
             setCreating(false);
         }
     }, [create, creating, navigate]);
+
+    // News from outside the open thread: activity elsewhere, new chats, reminders
+    useEffect(() => {
+        startAppSocket();
+        return stopAppSocket;
+    }, [startAppSocket, stopAppSocket]);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
