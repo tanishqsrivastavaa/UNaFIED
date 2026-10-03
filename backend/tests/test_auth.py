@@ -82,9 +82,9 @@ def test_login_invalid_credentials(client, mock_session):
 
 
 def test_me_without_token(client):
-    """Accessing /me without a token should return 403."""
+    """Accessing /me without a token should return 401."""
     response = client.get("/api/v1/me")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_refresh_invalid_token(client):
