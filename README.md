@@ -33,8 +33,8 @@ flowchart LR
 - **Plans need two people.** A proposal creates a `proposed` reminder for each person in the chat. It becomes `confirmed` only when someone other than the proposer agrees. Changing the time ("make it 5?") sends it back to `proposed` until the other person agrees again.
 - **Times are exact.** The model reads "4 pm today" in the sender's time zone, which the browser reports on sign-in, and answers in local time. The server converts that to UTC, and all timestamps are stored as `timestamptz`.
 - **Each person owns their reminder.** Undo on the card, or Remove in the reminders list, only affects your own copy.
-- **Replies never wait.** The Listener runs after the message is delivered, one message at a time per conversation.
-- **Alerts come from the server.** A scheduler checks every 30 seconds and claims each due reminder with one atomic update, so it fires once even with several servers. Because its state lives in the database, restarts lose nothing. Each person's open tabs share one app-wide socket, which also carries unread markers and new conversations.
+- **Replies never wait.** The Listener runs on a Celery worker after the message is delivered. The worker takes one job at a time, so each conversation's messages are read in order, whichever server received them.
+- **Alerts come from the server.** Celery beat runs the reminder check every 30 seconds, which claims each due reminder with one atomic update, so it fires once even with several servers. Because its state lives in the database, restarts lose nothing. Each person's open tabs share one app-wide socket, which also carries unread markers and new conversations.
 
 ## Stack
 
@@ -55,6 +55,7 @@ cd backend
 uv sync
 uv run alembic upgrade head
 uv run uvicorn main:app --reload
+uv run celery -A app.worker worker -B --loglevel info   # second terminal: the Listener and reminder alerts
 ```
 
 | Variable | What it is |
@@ -91,7 +92,7 @@ SMTP_FROM=you@gmail.com
 
 Each person still chooses "Email me too" in their reminder settings.
 
-**Everything in Docker** (its own Postgres, Redis and Mailpit; secrets still come from `backend/.env`). Reminder emails land in Mailpit at http://localhost:8025 instead of real inboxes:
+**Everything in Docker** (its own Postgres, Redis, Mailpit and Celery worker; secrets still come from `backend/.env`). Reminder emails land in Mailpit at http://localhost:8025 instead of real inboxes:
 
 ```bash
 docker compose up --build
@@ -114,6 +115,7 @@ backend/
   app/agents/listener_agent.py   what a message does to the chat's plans (pure, no database)
   app/services/listener.py       runs it in the background and applies the decision
   app/services/scheduler.py      fires due reminders: alerts and email
+  app/worker.py                  Celery: runs the Listener and the 30-second reminder check
   app/api/routes/reminders.py    list, confirm and dismiss your reminders
   app/api/websockets/            per-conversation sockets, Redis fan-out
   alembic/versions/              migrations
@@ -126,7 +128,7 @@ frontend/
 ## Known limits
 
 - **Closed tabs need email.** With every tab closed, only email reaches you, and only when SMTP is set. Web Push would cover that.
-- **The Listener's ordering is per server.** It keeps each conversation's messages in order on a single server. Running several servers needs a shared lock. The scheduler is already safe across servers.
+- **One Listener call at a time.** The single worker process keeps every conversation in order, but busy chats queue behind each other. Splitting chats across several single-process queues would lift that.
 - **One model call per message.** Every message in a shared chat costs one model call.
 
 ## License
