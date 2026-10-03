@@ -106,6 +106,7 @@ interface ChatState {
     closeThread: (id: string) => void;
     loadThread: (id: string) => Promise<void>;
     send: (id: string, content: string) => Promise<boolean>;
+    /** Tells the others you are (still) typing, or stopped. The caller paces the repeats. */
     setTyping: (id: string, isTyping: boolean) => void;
     /** Adds someone by email. Throws with the server's reason on failure. */
     invite: (id: string, email: string) => Promise<void>;
@@ -235,6 +236,8 @@ export const useChatStore = create<ChatState>((set, get) => {
                                 : [...list, message],
                         },
                         pending: mine ? { ...s.pending, [id]: null } : s.pending,
+                        // Their message is what the dots were promising; a late "stopped" may never come
+                        typing: { ...s.typing, [id]: (s.typing[id] ?? []).filter((t) => t.userId !== message.sender_id) },
                     };
                 });
                 // The server has the message, so the send is done; a reply, if any, arrives separately
@@ -510,7 +513,8 @@ export const useChatStore = create<ChatState>((set, get) => {
             }),
 
         setTyping: (id, isTyping) => {
-            if ((get().typingSent[id] ?? false) === isTyping) return;
+            // A repeated "typing" is a heartbeat that keeps it alive on the other side; a repeated "stopped" is noise.
+            if (!isTyping && !(get().typingSent[id] ?? false)) return;
             set((s) => ({ typingSent: { ...s.typingSent, [id]: isTyping } }));
             wsSend(id, "typing", { is_typing: isTyping });
         },

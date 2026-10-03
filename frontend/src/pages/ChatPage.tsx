@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useChatStore } from "../stores/chatStore";
 import { plainError } from "../lib/errors";
 import { isModK } from "../lib/platform";
 import { cn } from "../lib/cn";
+import { EASE } from "../lib/motion";
 import Rail from "../components/chat/Rail";
 import Thread from "../components/chat/Thread";
 import Lobby from "../components/chat/Lobby";
@@ -56,22 +57,36 @@ export default function ChatPage() {
     }, [startNew]);
 
     return (
-        <div className="flex h-dvh w-full">
+        <div className="flex h-dvh w-full md:gap-2 md:p-2">
             <Rail
                 onNew={() => void startNew()}
                 creating={creating}
                 createError={createError}
-                className={cn("w-full md:w-[272px] md:shrink-0", conversationId && "max-md:hidden")}
+                className={cn("rail-in w-full md:w-[272px] md:shrink-0", conversationId && "max-md:hidden")}
             />
-            <main className={cn("relative min-w-0 flex-1", !conversationId && "max-md:hidden")}>
-                <AnimatePresence initial={false}>
+            {/* The conversation is the one raised surface: a panel on the canvas. */}
+            <motion.main
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.05, ease: EASE }}
+                className={cn(
+                    "relative min-w-0 flex-1 overflow-hidden bg-panel md:rounded-[20px] md:shadow-panel",
+                    !conversationId && "max-md:hidden",
+                )}
+            >
+                {/*
+                  * No initial={false} here: Framer hands "initial: false" to everything inside a child
+                  * present on the first render, for good, so a thread opened by URL would never animate
+                  * a new message.
+                  */}
+                <AnimatePresence>
                     {conversationId ? (
                         <Thread key={conversationId} conversationId={conversationId} />
                     ) : (
                         <Lobby key="lobby" onNew={() => void startNew()} creating={creating} />
                     )}
                 </AnimatePresence>
-            </main>
+            </motion.main>
             <Alerts />
         </div>
     );
