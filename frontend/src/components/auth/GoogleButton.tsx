@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { LoaderCircle } from "lucide-react";
 import { getGoogleClientId } from "../../lib/api";
 import { plainError } from "../../lib/errors";
 import { useAuthStore } from "../../stores/authStore";
 import { FormError } from "./fields";
+import { EASE } from "../../lib/motion";
 
 interface CodeClient {
     requestCode(): void;
@@ -106,7 +108,7 @@ export default function GoogleButton() {
     if (!ready) return null;
 
     return (
-        <>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.28, ease: EASE }}>
             <div className="my-6 flex items-center gap-3 text-meta text-ink-4">
                 <span className="h-px flex-1 bg-line-2" />
                 or
@@ -114,7 +116,7 @@ export default function GoogleButton() {
             </div>
             <button
                 type="button"
-                className="btn btn-ghost w-full"
+                className="btn w-full border border-line-2 bg-panel text-ink hover:bg-fill-1"
                 disabled={pending}
                 onClick={() => {
                     setError(null);
@@ -138,6 +140,6 @@ export default function GoogleButton() {
                     <FormError id="google-error" message={error} />
                 </div>
             )}
-        </>
+        </motion.div>
     );
 }

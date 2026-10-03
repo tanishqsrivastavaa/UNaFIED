@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useLocation, useOutlet } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Wordmark from "../ui/Wordmark";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
+import ThemeToggle from "../ui/ThemeToggle";
+import { EASE } from "../../lib/motion";
 
 /** Holds on to the outlet it mounted with, so the leaving form can animate out intact. */
 function FrozenOutlet() {
@@ -12,28 +12,31 @@ function FrozenOutlet() {
     return frozen;
 }
 
-/** One narrow column in a lot of dark: the wordmark in a corner, the form in the middle. */
+/** The wordmark and a theme switch on top, one card in the middle, one line about the product below. */
 export default function AuthShell() {
     const { pathname } = useLocation();
 
     return (
-        <div className="grid min-h-dvh w-full grid-rows-[auto_1fr_auto] px-6 py-6 sm:px-10 sm:py-8">
+        <div className="grid min-h-dvh w-full grid-rows-[auto_1fr_auto] px-4 py-4 sm:px-8 sm:py-6">
             <motion.header
+                className="flex h-10 items-center justify-between pl-2"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, ease: EASE }}
+                transition={{ duration: 0.35, ease: EASE }}
             >
                 <Wordmark />
+                <ThemeToggle />
             </motion.header>
 
-            <motion.main
-                className="flex items-center justify-center py-12"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1, ease: EASE }}
-            >
-                <div className="w-full max-w-[360px]">
-                    <AnimatePresence mode="wait" initial={false}>
+            <main className="flex items-center justify-center py-10">
+                <motion.div
+                    className="w-full max-w-[400px] rounded-2xl bg-panel px-6 py-8 shadow-panel sm:px-9 sm:py-10"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: 0.06, ease: EASE }}
+                >
+                    {/* No initial={false}: it would silence every entrance inside the first form, for good. */}
+                    <AnimatePresence mode="wait">
                         <motion.div
                             key={pathname}
                             initial={{ opacity: 0, y: 4 }}
@@ -44,14 +47,14 @@ export default function AuthShell() {
                             <FrozenOutlet />
                         </motion.div>
                     </AnimatePresence>
-                </div>
-            </motion.main>
+                </motion.div>
+            </main>
 
             <motion.p
-                className="max-w-[46ch] text-sm text-ink-4"
+                className="mx-auto max-w-[46ch] pb-2 text-center text-sm text-ink-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.25, ease: EASE }}
+                transition={{ duration: 0.35, delay: 0.12, ease: EASE }}
             >
                 UNaFIED sits in your conversations, remembers what was said, and asks before it does anything it
                 can&rsquo;t undo.

@@ -1,5 +1,7 @@
 import { useState, type InputHTMLAttributes } from "react";
+import { motion } from "framer-motion";
 import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { rise } from "../../lib/motion";
 
 type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "type">;
 
@@ -7,7 +9,7 @@ export function EmailField({ id, label, hint, ...rest }: InputProps & { id: stri
     const hintId = hint ? `${id}-hint` : undefined;
     return (
         <div>
-            <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink-3">
+            <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink-2">
                 {label}
             </label>
             <input id={id} type="email" className="field" aria-describedby={hintId} {...rest} />
@@ -33,7 +35,7 @@ export function PasswordField({
 
     return (
         <div>
-            <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink-3">
+            <label htmlFor={id} className="mb-2 block text-sm font-medium text-ink-2">
                 {label}
             </label>
             <div className="relative">
@@ -49,7 +51,7 @@ export function PasswordField({
                     onClick={() => setVisible((v) => !v)}
                     aria-label={visible ? "Hide password" : "Show password"}
                     aria-pressed={visible}
-                    className="btn btn-quiet btn-icon absolute right-[3px] top-[3px] rounded-[10px]"
+                    className="btn btn-quiet btn-icon absolute right-[3px] top-[3px]"
                 >
                     {visible ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                 </button>
@@ -65,13 +67,14 @@ export function PasswordField({
 
 export function FormError({ id, message }: { id: string; message: string }) {
     return (
-        <p
+        <motion.p
             id={id}
             role="alert"
             className="flex items-start gap-2.5 rounded-md bg-fill-2 px-3.5 py-3 text-sm text-ink-2"
+            {...rise}
         >
             <AlertCircle size={16} className="mt-0.5 shrink-0 text-ink-3" aria-hidden="true" />
             <span>{message}</span>
-        </p>
+        </motion.p>
     );
 }
