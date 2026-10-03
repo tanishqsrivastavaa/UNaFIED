@@ -4,6 +4,7 @@ import { LoaderCircle } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import { plainError } from "../lib/errors";
 import { EmailField, FormError, PasswordField } from "../components/auth/fields";
+import GoogleButton from "../components/auth/GoogleButton";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -67,6 +68,8 @@ export default function LoginPage() {
                     )}
                 </button>
             </form>
+
+            <GoogleButton />
 
             <p className="mt-8 text-sm text-ink-4">
                 New here?{" "}
