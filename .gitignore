@@ -1,3 +1,7 @@
 # Local-only files, never committed
 PLAN.md
 TODO.local.md
+
+# Redis snapshots and Celery beat's schedule, written wherever they run
+dump.rdb
+celerybeat-schedule*
