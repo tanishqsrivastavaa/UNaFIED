@@ -8,6 +8,10 @@ from jwt import PyJWTError
 from datetime import datetime, timedelta, timezone
 from fastapi.security import HTTPBearer
 from passlib.context import CryptContext
+import httpx
+from google.auth.exceptions import GoogleAuthError
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from typing import Any
 from app.db.db import get_session
 from app.models.user import User
@@ -76,6 +80,48 @@ def verify_refresh_token(token: str) -> dict[str, Any]:
         return payload
     except PyJWTError:
         raise HTTPException(status_code=401, detail="Could not validate refresh token")
+
+
+def verify_google_token(credential: str) -> str:
+    """The verified email inside a Google sign-in credential issued for our client ID."""
+    if not settings.GOOGLE_CLIENT_ID:
+        # Without an audience to check, a token issued to any other app would pass.
+        raise HTTPException(status_code=404, detail="Google sign-in is turned off")
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=10,  # WSL clocks drift; with none, fresh tokens fail as "used too early"
+        )
+    except (ValueError, GoogleAuthError):
+        raise HTTPException(status_code=401, detail="Could not validate Google credentials")
+    if not claims.get("email_verified"):
+        raise HTTPException(status_code=401, detail="Google hasn't verified this email")
+    return claims["email"]
+
+
+def google_email_from_code(code: str) -> str:
+    """Swap the one-time code from our own Google button for the person's verified email."""
+    if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
+        raise HTTPException(status_code=404, detail="Google sign-in is turned off")
+    try:
+        response = httpx.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "redirect_uri": "postmessage",  # the code came back to a popup, not a redirect
+                "grant_type": "authorization_code",
+            },
+            timeout=10,
+        )
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Can't reach Google right now. Try again in a moment.")
+    if response.status_code != 200:
+        raise HTTPException(status_code=401, detail="Could not validate Google credentials")
+    return verify_google_token(response.json().get("id_token", ""))
 
 
 # --- Get Current User ---
