@@ -33,7 +33,7 @@ services:
     ports:
       - "8025:8025"
 
-  backend:
+  backend: &app
     build: ./backend
     ports:
       - "8000:8000"
@@ -58,6 +58,12 @@ services:
     command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - ./backend:/app
+
+  # Runs the Listener on each message and fires due reminders (Celery beat, every 30 seconds).
+  worker:
+    <<: *app
+    ports: []
+    command: celery -A app.worker worker -B --loglevel info
 
   frontend:
     build: ./frontend
