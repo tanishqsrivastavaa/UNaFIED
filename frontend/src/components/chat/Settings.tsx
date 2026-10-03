@@ -1,11 +1,17 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Settings2 } from "lucide-react";
+import { Monitor, Moon, Settings2, Sun } from "lucide-react";
 import { getPreferences, updatePreferences, type Preferences } from "../../lib/api";
 import { cn } from "../../lib/cn";
+import { EASE, pop } from "../../lib/motion";
 import { pushSupported, serverKey, subscribe, syncSubscription, unsubscribe } from "../../lib/push";
+import { setTheme, useTheme, type ThemeChoice } from "../../lib/theme";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
+const THEMES: [ThemeChoice, string, typeof Sun][] = [
+    ["system", "System", Monitor],
+    ["light", "Light", Sun],
+    ["dark", "Dark", Moon],
+];
 const LEADS: [number, string][] = [
     [0, "At the time"],
     [5, "5 minutes before"],
@@ -17,7 +23,47 @@ const LEADS: [number, string][] = [
 
 type SaveState = "idle" | "saving" | "saved" | "failed";
 
-/** Rail footer control: when reminders alert you, and how they reach you when the app is closed. */
+/** How the theme is chosen: follow the system, or keep one. Native radios, so arrow keys work. */
+function Appearance() {
+    const { choice } = useTheme();
+    return (
+        <fieldset>
+            <legend className="text-sm font-medium text-ink">Appearance</legend>
+            <div className="mt-2 grid grid-cols-3 gap-1 rounded-[12px] bg-fill-2 p-1">
+                {THEMES.map(([value, label, Icon]) => (
+                    <label
+                        key={value}
+                        className={cn(
+                            "relative flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[9px] text-sm transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-ring",
+                            choice === value ? "text-ink" : "text-ink-3 hover:text-ink",
+                        )}
+                    >
+                        {choice === value && (
+                            <motion.span
+                                layoutId="theme-choice"
+                                aria-hidden="true"
+                                className="absolute inset-0 rounded-[9px] bg-panel shadow-pill"
+                                transition={{ duration: 0.3, ease: EASE }}
+                            />
+                        )}
+                        <input
+                            type="radio"
+                            name="theme"
+                            value={value}
+                            checked={choice === value}
+                            onChange={() => setTheme(value)}
+                            className="sr-only"
+                        />
+                        <Icon size={14} aria-hidden="true" className="relative" />
+                        <span className="relative">{label}</span>
+                    </label>
+                ))}
+            </div>
+        </fieldset>
+    );
+}
+
+/** Rail footer control: the theme, when reminders alert you, and how they reach you when the app is closed. */
 export default function Settings() {
     const [open, setOpen] = useState(false);
     const [prefs, setPrefs] = useState<Preferences | null>(null);
@@ -101,11 +147,11 @@ export default function Settings() {
                 ref={buttonRef}
                 type="button"
                 onClick={toggle}
-                aria-label="Reminder settings"
-                title="Reminder settings"
+                aria-label="Settings"
+                title="Settings"
                 aria-expanded={open}
                 aria-controls={id}
-                className={cn("btn btn-quiet btn-icon shrink-0 text-ink-4", open && "bg-fill-2 text-ink")}
+                className={cn("btn btn-quiet btn-icon shrink-0 text-ink-3", open && "bg-fill-2 text-ink")}
             >
                 <Settings2 size={16} aria-hidden="true" />
             </button>
@@ -114,22 +160,24 @@ export default function Settings() {
                 {open && (
                     <motion.section
                         id={id}
-                        aria-label="Reminder settings"
-                        className="absolute inset-x-3 bottom-[60px] z-40 rounded-2xl border border-line-1 bg-coal p-4 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.8)]"
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 4, transition: { duration: 0.15 } }}
-                        transition={{ duration: 0.25, ease: EASE }}
+                        aria-label="Settings"
+                        className="pop absolute inset-x-3 bottom-[60px] z-40 origin-bottom p-4 md:inset-x-1 md:bottom-[52px]"
+                        {...pop}
+                        initial={{ opacity: 0, scale: 0.97, y: 4 }}
                     >
-                        <h2 className="text-sm font-medium text-ink">Reminders</h2>
+                        <Appearance />
+                        <h2 className="mt-5 border-t border-line-1 pt-4 text-sm font-medium text-ink">Reminders</h2>
                         {loadFailed ? (
                             <p role="alert" className="mt-2 text-sm text-ink-2">
                                 Your settings didn&rsquo;t load. Close this and try again.
                             </p>
                         ) : !prefs ? (
-                            <p role="status" className="mt-2 text-sm text-ink-4">
-                                Loading…
-                            </p>
+                            <div role="status" className="mt-3 space-y-2.5">
+                                <span className="sr-only">Loading…</span>
+                                <span aria-hidden="true" className="skeleton block h-2.5 w-1/3 rounded-full" />
+                                <span aria-hidden="true" className="skeleton block h-10 rounded-[12px]" />
+                                <span aria-hidden="true" className="skeleton block h-2.5 w-2/3 rounded-full" />
+                            </div>
                         ) : (
                             <>
                                 <label htmlFor={`${id}-lead`} className="mt-3 block text-meta text-ink-3">
@@ -151,7 +199,7 @@ export default function Settings() {
                                 <label className={cn("mt-3 flex items-center gap-2.5 text-sm text-ink-2", !pushReady && "opacity-60")}>
                                     <input
                                         type="checkbox"
-                                        className="size-4 accent-[var(--color-bone)]"
+                                        className="size-4 accent-[var(--ink)]"
                                         checked={pushReady && !!push?.on}
                                         disabled={!pushReady || save === "saving"}
                                         onChange={(e) => void changePush(e.target.checked)}
@@ -160,7 +208,7 @@ export default function Settings() {
                                     Alert me when the app is closed
                                 </label>
                                 {pushNote && (
-                                    <p id={`${id}-push-note`} className="mt-1 pl-[26px] text-meta text-ink-4">
+                                    <p id={`${id}-push-note`} className="mt-1 pl-[26px] text-meta text-ink-3">
                                         {pushNote}
                                     </p>
                                 )}
@@ -168,7 +216,7 @@ export default function Settings() {
                                 <label className={cn("mt-3 flex items-center gap-2.5 text-sm text-ink-2", !prefs.email_available && "opacity-60")}>
                                     <input
                                         type="checkbox"
-                                        className="size-4 accent-[var(--color-bone)]"
+                                        className="size-4 accent-[var(--ink)]"
                                         checked={prefs.email_notifications}
                                         disabled={!prefs.email_available}
                                         onChange={(e) => void change({ email_notifications: e.target.checked })}
@@ -177,12 +225,12 @@ export default function Settings() {
                                     Email me too
                                 </label>
                                 {!prefs.email_available && (
-                                    <p id={`${id}-email-note`} className="mt-1 pl-[26px] text-meta text-ink-4">
+                                    <p id={`${id}-email-note`} className="mt-1 pl-[26px] text-meta text-ink-3">
                                         Email isn&rsquo;t set up on this server yet.
                                     </p>
                                 )}
 
-                                <p role="status" className="mt-3 h-4 text-meta text-ink-4">
+                                <p role="status" className="mt-3 h-4 text-meta text-ink-3">
                                     {save === "saving" ? "Saving…" : save === "saved" ? "Saved" : save === "failed" ? "That didn't save. Try again." : ""}
                                 </p>
                             </>
