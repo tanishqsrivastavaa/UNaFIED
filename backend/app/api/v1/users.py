@@ -1,9 +1,11 @@
+import asyncio
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlmodel import Session
 from ...core.redis import get_redis
-from ...core.security import get_current_user
+from ...config.settings import settings
+from ...core.security import get_current_user, google_email_from_code
 from ...db.db import get_session
 from ...models.user import User
 from ...schemas.user import LoginRequest, UserCreate, UserRead, PreferencesRead, PreferencesUpdate
@@ -13,6 +15,7 @@ from ...core.clock import utcnow
 from ...crud.user import (
     create_user,
     authenticate_user,
+    authenticate_google_user,
     rotate_refresh_token,
     revoke_refresh_token,
 )
@@ -33,6 +36,29 @@ async def login(body: LoginRequest, session: Session = Depends(get_session)):
     result = await authenticate_user(body, session)
     if not result:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    return result
+
+
+class GoogleLoginRequest(BaseModel):
+    code: str
+
+
+@router.get("/auth/google")
+def google_client_id():
+    """The client ID the sign-in button needs; null when Google sign-in is off (it takes the ID and the secret)."""
+    return {"client_id": settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_SECRET else None}
+
+
+@router.post("/auth/google")
+async def google_login(body: GoogleLoginRequest, session: Session = Depends(get_session)):
+    # Both steps call Google over the network, so keep them off the event loop.
+    email = await asyncio.to_thread(google_email_from_code, body.code)
+    result = await authenticate_google_user(email, session)
+    if not result:
+        raise HTTPException(
+            status_code=409,
+            detail="This email already has a password. Sign in with your email and password instead.",
+        )
     return result
 
 
