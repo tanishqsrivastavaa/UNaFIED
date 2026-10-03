@@ -5,8 +5,7 @@ import { X } from "lucide-react";
 import { when } from "../../lib/time";
 import { useReminderStore } from "../../stores/reminderStore";
 import Presence from "../ui/Presence";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
+import { EASE } from "../../lib/motion";
 // The server decides when a reminder is due and pushes it on the app-wide socket;
 // polling only catches what a dropped socket missed. Closed tabs get Web Push or email.
 const POLL_MS = 60_000;
@@ -38,19 +37,20 @@ export default function Alerts() {
     useEffect(() => check(Date.now()), [reminders, check]);
 
     return (
-        <div aria-live="polite" className="pointer-events-none fixed inset-x-3 top-3 z-30 flex flex-col gap-2 md:inset-x-auto md:bottom-16 md:left-3 md:top-auto md:w-[248px]">
+        <div aria-live="polite" className="pointer-events-none fixed inset-x-3 top-3 z-30 flex flex-col gap-2 md:inset-x-auto md:bottom-16 md:left-3 md:top-auto md:w-[256px]">
             <AnimatePresence initial={false}>
                 {alerts.map((a) => (
                     <motion.div
                         key={a.id}
+                        layout="position"
                         role="status"
-                        className="pointer-events-auto flex items-start gap-3 rounded-2xl border border-line-2 bg-coal py-3.5 pl-4 pr-2 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.8)]"
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 4, transition: { duration: 0.15 } }}
-                        transition={{ duration: 0.35, ease: EASE }}
+                        className="pop pointer-events-auto flex items-start gap-3 py-3.5 pl-4 pr-2"
+                        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 6, transition: { duration: 0.18, ease: EASE } }}
+                        transition={{ duration: 0.3, ease: EASE }}
                     >
-                        <Presence className="mt-2" />
+                        <Presence mode="listen" className="mt-2" />
                         <div className="min-w-0 flex-1">
                             <p className="truncate text-body font-medium text-ink">{a.title}</p>
                             <p className="tnum text-meta text-ink-3">{when(a.due_at, now)}</p>
@@ -66,7 +66,7 @@ export default function Alerts() {
                         </div>
                         <button
                             type="button"
-                            className="btn btn-quiet btn-icon size-9 shrink-0 rounded-[8px] text-ink-4"
+                            className="btn btn-quiet btn-icon size-9 shrink-0 text-ink-3"
                             onClick={() => dismissAlert(a.id)}
                             aria-label={`Dismiss reminder: ${a.title}`}
                         >

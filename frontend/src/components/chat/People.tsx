@@ -7,8 +7,8 @@ import { useAuthStore } from "../../stores/authStore";
 import { useChatStore } from "../../stores/chatStore";
 import { plainError } from "../../lib/errors";
 import { cn } from "../../lib/cn";
+import { EASE, pop, rise } from "../../lib/motion";
 
-const EASE = [0.22, 1, 0.36, 1] as const;
 const DISARM_MS = 3000;
 const LEAVE = "leave";
 const NO_PARTICIPANTS: Participant[] = [];
@@ -128,7 +128,7 @@ export default function People({ conversationId }: { conversationId: string }) {
             <button
                 ref={buttonRef}
                 type="button"
-                className={cn("btn btn-quiet btn-icon text-ink-4", open && "bg-fill-2 text-ink")}
+                className={cn("btn btn-quiet btn-icon text-ink-3", open && "bg-fill-2 text-ink")}
                 title="People"
                 aria-label="People"
                 aria-expanded={open}
@@ -145,11 +145,8 @@ export default function People({ conversationId }: { conversationId: string }) {
                         id={panelId}
                         tabIndex={-1}
                         aria-label="People in this conversation"
-                        className="absolute right-0 top-12 z-20 w-[340px] rounded-2xl border border-line-1 bg-coal p-4 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.8)] outline-none max-sm:fixed max-sm:inset-x-4 max-sm:top-[68px] max-sm:w-auto"
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4, transition: { duration: 0.15 } }}
-                        transition={{ duration: 0.25, ease: EASE }}
+                        className="pop absolute right-0 top-12 z-20 w-[340px] origin-top-right p-4 outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[64px] max-sm:w-auto"
+                        {...pop}
                     >
                         <div className="flex items-center justify-between">
                             <h2 className="text-sm font-medium text-ink">People</h2>
@@ -158,18 +155,27 @@ export default function People({ conversationId }: { conversationId: string }) {
                             </button>
                         </div>
 
-                        <ul className="-mx-2 mt-1 max-h-[200px] space-y-px overflow-y-auto">
+                        <ul className="relative -mx-2 mt-1 max-h-[200px] space-y-px overflow-y-auto">
+                            <AnimatePresence initial={false} mode="popLayout">
                             {members.map((person) => {
                                 const you = person.user_id === me;
                                 const owner = person.role === "owner";
                                 const isArmed = armed === person.user_id;
                                 const tag = you ? (owner ? "You · owner" : "You") : owner ? "Owner" : "";
                                 return (
-                                    <li key={person.user_id} className="flex h-10 items-center gap-2 pl-2">
+                                    <motion.li
+                                        key={person.user_id}
+                                        layout="position"
+                                        className="flex h-10 items-center gap-2 pl-2"
+                                        initial={{ opacity: 0, y: 4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2, ease: EASE } }}
+                                        transition={{ duration: 0.28, ease: EASE, layout: { duration: 0.3, ease: EASE } }}
+                                    >
                                         <span className="min-w-0 flex-1 truncate text-sm text-ink-2" title={person.email}>
                                             {person.email}
                                         </span>
-                                        {tag && <span className="shrink-0 pr-2 text-meta text-ink-4">{tag}</span>}
+                                        {tag && <span className="shrink-0 pr-2 text-meta text-ink-3">{tag}</span>}
                                         {isOwner && !you && (
                                             <button
                                                 type="button"
@@ -180,16 +186,17 @@ export default function People({ conversationId }: { conversationId: string }) {
                                                 aria-busy={busy === person.user_id}
                                                 title={isArmed ? undefined : "Remove"}
                                                 className={cn(
-                                                    "btn btn-quiet h-10 shrink-0 rounded-[10px]",
-                                                    isArmed ? "bg-fill-3 px-3 text-sm text-ink" : "w-10 px-0 text-ink-4",
+                                                    "btn btn-quiet h-9 shrink-0 rounded-full",
+                                                    isArmed ? "bg-ink px-3.5 text-sm text-panel hover:bg-ink hover:text-panel" : "w-9 px-0 text-ink-3",
                                                 )}
                                             >
                                                 {isArmed ? "Remove" : <UserMinus size={15} aria-hidden="true" />}
                                             </button>
                                         )}
-                                    </li>
+                                    </motion.li>
                                 );
                             })}
+                            </AnimatePresence>
                         </ul>
 
                         <form onSubmit={add} className="mt-3 border-t border-line-1 pt-3">
@@ -213,12 +220,14 @@ export default function People({ conversationId }: { conversationId: string }) {
                             </div>
                         </form>
 
-                        {error && (
-                            <p role="alert" className="mt-2.5 flex items-start gap-2 text-sm text-ink-2">
-                                <AlertCircle size={15} className="mt-0.5 shrink-0 text-ink-3" aria-hidden="true" />
-                                {error}
-                            </p>
-                        )}
+                        <AnimatePresence>
+                            {error && (
+                                <motion.p role="alert" className="mt-2.5 flex items-start gap-2 text-sm text-ink-2" {...rise}>
+                                    <AlertCircle size={15} className="mt-0.5 shrink-0 text-ink-3" aria-hidden="true" />
+                                    {error}
+                                </motion.p>
+                            )}
+                        </AnimatePresence>
 
                         {canLeave && (
                             <div className="mt-3 border-t border-line-1 pt-3">
@@ -230,7 +239,7 @@ export default function People({ conversationId }: { conversationId: string }) {
                                     aria-busy={busy === LEAVE}
                                     className={cn(
                                         "btn btn-quiet -mx-2 h-10 w-[calc(100%+16px)] justify-start gap-2.5 rounded-[10px] px-2 text-sm",
-                                        armed === LEAVE ? "bg-fill-3 text-ink" : "text-ink-3",
+                                        armed === LEAVE ? "bg-ink text-panel hover:bg-ink hover:text-panel" : "text-ink-3",
                                     )}
                                 >
                                     <LogOut size={15} aria-hidden="true" />
