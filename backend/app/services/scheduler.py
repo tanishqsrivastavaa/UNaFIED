@@ -2,7 +2,8 @@
 Fires reminders when they come due: marks each one sent, alerts every open tab
 of its owner, pushes to browsers that asked for alerts while the app is closed,
 and emails people who turned email on. "Due" means within the
-owner's lead time of the reminder's time.
+owner's lead time of the reminder's time. Celery beat runs fire_due every 30
+seconds on the worker (app/worker.py).
 
 All state lives in the reminder table, so a restart picks up where it left off,
 and the claim below makes each reminder fire once even with several servers.
@@ -25,7 +26,6 @@ from ..models.push import PushSubscription
 from ..models.reminder import Reminder
 from ..models.user import User, UserPreferences
 
-TICK_SECONDS = 30
 DEFAULT_LEAD = 15  # minutes, for people who never opened their settings
 MAX_LEAD = timedelta(minutes=1440)  # the longest lead the settings allow
 MISSED = timedelta(minutes=30)  # found later than this (the server was down): close it quietly
@@ -40,15 +40,6 @@ class Due:
     at: datetime
     email: str | None
     zone: str
-
-
-async def run(sessions=SessionLocal) -> None:
-    while True:
-        try:
-            await fire_due(sessions)
-        except Exception:
-            logger.exception("Reminder scheduler tick failed")
-        await asyncio.sleep(TICK_SECONDS)
 
 
 def _utc(at: datetime) -> datetime:

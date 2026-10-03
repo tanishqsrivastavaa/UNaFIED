@@ -1,5 +1,4 @@
 import os
-import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +11,6 @@ from app.api.websockets import chat_ws
 from app.api.websockets.manager import get_connection_manager
 from app.core.redis import get_redis
 from app.core.logger import logger
-from app.services import scheduler
 
 load_dotenv()
 
@@ -30,13 +28,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("WebSocket manager initialized with Redis Pub/Sub")
 
-    # Tests turn this off so they never fire real reminders
-    ticker = asyncio.create_task(scheduler.run()) if os.getenv("RUN_SCHEDULER", "true") != "false" else None
-
     yield
-
-    if ticker:
-        ticker.cancel()
 
     # Shutdown
     logger.info("Shutting down UNaFIED backend...")

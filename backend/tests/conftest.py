@@ -1,8 +1,3 @@
-import os
-
-# The app starts the reminder scheduler on startup; a test run must never fire real reminders.
-os.environ["RUN_SCHEDULER"] = "false"
-
 import pytest
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, create_engine
