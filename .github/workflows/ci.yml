@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Settings refuses to load without these. The tests use in-memory SQLite and fakes,
+      # so nothing here is ever contacted.
+      DATABASE_URL: sqlite://
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_AUTH_KEY: ci-only
+      GROQ_API_KEY: ci-only
+      GEMINI_API_KEY: ci-only
+      CORS_ORIGINS: http://localhost:5173
+      DEBUG: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen
+      - run: uv run pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
