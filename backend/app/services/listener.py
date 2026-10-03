@@ -1,7 +1,7 @@
 """
-Runs the Listener after each human message, off the reply path, applies its
-decision to the reminder table, and posts a "Reminder set" message once a plan
-is agreed.
+Runs the Listener after each human message, on the Celery worker (app/worker.py),
+applies its decision to the reminder table, and posts a "Reminder set" message
+once a plan is agreed.
 
 A plan is the set of reminder rows (one per person in the chat) that share the
 message which last proposed it. Rows start "proposed". A yes from anyone other
@@ -13,9 +13,7 @@ sender only, confirmed from the start. Only its owner can change or cancel it.
 It is the only thing the Listener sets in a solo chat.
 """
 
-import asyncio
 import uuid
-from collections import defaultdict
 from datetime import datetime, timezone, tzinfo
 from zoneinfo import ZoneInfo
 from sqlmodel import select, desc, func
@@ -32,25 +30,15 @@ HISTORY = 12  # messages of context the model sees
 OPEN = ("proposed", "confirmed", "sent")  # "sent": alerted, but the meeting may still be ahead
 YES = ("confirmed", "sent")
 
-_tasks: set[asyncio.Task] = set()
-# ponytail: per-process locks keep one conversation's messages in order on a single
-# server; two servers could race. Move to a Redis lock or a queue when scaling out.
-_locks: defaultdict[uuid.UUID, asyncio.Lock] = defaultdict(asyncio.Lock)
-
 
 def watch(conversation_id: uuid.UUID, message_id: uuid.UUID) -> None:
-    """Starts the Listener on a saved human message without waiting for it."""
-    task = asyncio.create_task(_run(conversation_id, message_id))
-    _tasks.add(task)  # the event loop only keeps weak references to tasks
-    task.add_done_callback(_tasks.discard)
+    """Queues the Listener on a saved human message without waiting for it."""
+    from ..worker import listen_to_message  # the worker imports this module
 
-
-async def _run(conversation_id: uuid.UUID, message_id: uuid.UUID) -> None:
     try:
-        async with _locks[conversation_id]:
-            await listen(conversation_id, message_id)
+        listen_to_message.delay(str(conversation_id), str(message_id))
     except Exception:
-        logger.exception(f"Listener failed on message {message_id}")
+        logger.exception(f"Could not queue the Listener for message {message_id}")
 
 
 def _local(at: datetime, zone: tzinfo) -> datetime:
