@@ -67,6 +67,7 @@ uv run celery -A app.worker worker -B --loglevel info   # second terminal: the L
 | `GEMINI_API_KEY` | Message embeddings |
 | `CORS_ORIGINS` | e.g. `http://localhost:5173` |
 | `DEBUG` | `true` or `false` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. A Google OAuth Web client; set both to turn on "Continue with Google". Add `http://localhost:5173` to its Authorized JavaScript origins |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional. Set them to email reminders; leave `SMTP_HOST` unset to turn email off |
 
 **Frontend:**
