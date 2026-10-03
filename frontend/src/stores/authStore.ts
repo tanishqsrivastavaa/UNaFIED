@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
     login as apiLogin,
     signup as apiSignup,
+    googleLogin as apiGoogleLogin,
     logout as apiLogout,
     getMe,
     getAccessToken,
@@ -20,6 +21,7 @@ interface AuthState {
 
     login: (email: string, password: string) => Promise<void>;
     signup: (email: string, password: string) => Promise<void>;
+    loginWithGoogle: (code: string) => Promise<void>;
     logout: () => Promise<void>;
     hydrate: () => Promise<void>;
 }
@@ -51,6 +53,19 @@ export const useAuthStore = create<AuthState>((set) => ({
             set({ user, loading: false });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : "Signup failed";
+            set({ error: message, loading: false });
+            throw err;
+        }
+    },
+
+    loginWithGoogle: async (code) => {
+        set({ loading: true, error: null });
+        try {
+            await apiGoogleLogin(code);
+            const user = await getMe();
+            set({ user, loading: false });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Google sign-in failed";
             set({ error: message, loading: false });
             throw err;
         }

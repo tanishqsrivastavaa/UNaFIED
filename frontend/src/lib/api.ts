@@ -113,6 +113,21 @@ export async function login(email: string, password: string) {
     return data;
 }
 
+/** The client ID for the Google button; null when the server has Google sign-in off. */
+export async function getGoogleClientId() {
+    return apiFetch<{ client_id: string | null }>("/auth/google");
+}
+
+/** Trades the one-time code from Google's popup for our own tokens, making the account on first visit. */
+export async function googleLogin(code: string) {
+    const data = await apiFetch<AuthResponse>("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+    });
+    setTokens(data.access_token, data.refresh_token);
+    return data;
+}
+
 export async function logout() {
     const refreshToken = getRefreshToken();
     if (refreshToken) {
