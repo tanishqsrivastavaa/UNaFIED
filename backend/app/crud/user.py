@@ -40,6 +40,28 @@ async def authenticate_user(body: LoginRequest, session: Session) -> dict | None
     ):
         return None
 
+    return _issue_tokens(user, session)
+
+
+async def authenticate_google_user(email: str, session: Session) -> dict | None:
+    """Sign in the owner of a Google-verified email, creating their account on first visit.
+    Returns None if a password account already holds the email."""
+    user = session.exec(select(User).where(User.email == email)).first()
+
+    if user is None:
+        user = User(email=email, auth_provider="google")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+    elif user.auth_provider != "google":
+        # Signup never checks that people own their email, so a password account under this
+        # address may be someone else's; linking it would let them keep using it with their password.
+        return None
+
+    return _issue_tokens(user, session)
+
+
+def _issue_tokens(user: User, session: Session) -> dict:
     access_token = create_token({"sub": str(user.id)})
     raw_refresh_token = create_refresh_token({"sub": str(user.id)})
 
