@@ -1,48 +1,131 @@
 @import "tailwindcss";
 
 /*
- * UNaFIED — "Night field"
+ * UNaFIED — "Quiet panels"
  *
- * One neutral dark room, one typeface, and one colour. Sage belongs to the
- * assistant: its presence dot, its name, its proposals. Everything a person
- * does is off-white.
+ * A soft canvas, one raised panel for the conversation, and neutral ink.
+ * People's actions are ink; your own bubble inverts. Violet belongs to the
+ * assistant alone: its mark, its name, its thinking, its proposals.
  *
- * Every shared class lives inside @layer. Unlayered CSS beats every
- * layer regardless of specificity and silently kills utilities.
+ * Colours are tokens on :root (light) and [data-theme="dark"]; index.html sets
+ * data-theme before first paint. Every shared class lives inside @layer:
+ * unlayered CSS beats every layer regardless of specificity and kills utilities.
  */
+
+:root {
+  color-scheme: light;
+  --canvas: #ececef;
+  --panel: #ffffff;
+  --raised: #ffffff;
+  --field: #f4f4f6;
+  --hover-canvas: rgb(255 255 255 / 0.6);
+
+  /* ink at four strengths; each passes 4.5:1 on every ground it lands on (see notes) */
+  --ink: #141417;
+  --ink-2: #3f3f46;
+  --ink-3: #5a5a63;
+  --ink-4: #65656e;
+
+  --fill-1: rgb(20 20 23 / 0.035);
+  --fill-2: rgb(20 20 23 / 0.06);
+  --fill-3: rgb(20 20 23 / 0.09);
+  --line-1: rgb(20 20 23 / 0.07);
+  --line-2: rgb(20 20 23 / 0.11);
+  --line-3: rgb(20 20 23 / 0.2);
+
+  --own: #1b1b1f;
+  --on-own: #fafafa;
+  --other: #f1f1f4;
+
+  --accent: #6440d6;
+  --accent-wash: rgb(100 64 214 / 0.06);
+  --accent-line: rgb(100 64 214 / 0.22);
+  --accent-glow: rgb(100 64 214 / 0.16);
+  --accent-glow-2: rgb(231 120 92 / 0.1);
+
+  --ring: #3f3f46;
+  --selection: rgb(20 20 23 / 0.14);
+  --shimmer: rgb(255 255 255 / 0.7);
+  --sh-panel: 0 0 0 1px rgb(20 20 23 / 0.05), 0 1px 2px rgb(20 20 23 / 0.04), 0 8px 24px -12px rgb(20 20 23 / 0.08);
+  --sh-pop: 0 0 0 1px rgb(20 20 23 / 0.07), 0 16px 40px -16px rgb(20 20 23 / 0.22);
+  --sh-pill: 0 0 0 1px rgb(20 20 23 / 0.05), 0 1px 2px rgb(20 20 23 / 0.06);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #09090b;
+  --panel: #131316;
+  --raised: #1a1a1e;
+  --field: #1c1c20;
+  --hover-canvas: rgb(255 255 255 / 0.035);
+
+  --ink: #ededf0;
+  --ink-2: #c9c9cf;
+  --ink-3: #a3a3ac;
+  --ink-4: #8e8e98;
+
+  --fill-1: rgb(255 255 255 / 0.04);
+  --fill-2: rgb(255 255 255 / 0.07);
+  --fill-3: rgb(255 255 255 / 0.1);
+  --line-1: rgb(255 255 255 / 0.06);
+  --line-2: rgb(255 255 255 / 0.1);
+  --line-3: rgb(255 255 255 / 0.18);
+
+  --own: #2a2a30;
+  --on-own: #ededf0;
+  --other: #1a1a1d;
+
+  --accent: #a88fff;
+  --accent-wash: rgb(168 143 255 / 0.06);
+  --accent-line: rgb(168 143 255 / 0.22);
+  --accent-glow: rgb(140 110 255 / 0.2);
+  --accent-glow-2: rgb(231 120 92 / 0.08);
+
+  --ring: #c9c9cf;
+  --selection: rgb(237 237 240 / 0.2);
+  --shimmer: rgb(255 255 255 / 0.06);
+  --sh-panel: 0 0 0 1px rgb(255 255 255 / 0.06), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  --sh-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 20px 48px -20px rgb(0 0 0 / 0.8);
+  --sh-pill: 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-field: var(--field);
+  --color-hover-canvas: var(--hover-canvas);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-fill-1: var(--fill-1);
+  --color-fill-2: var(--fill-2);
+  --color-fill-3: var(--fill-3);
+  --color-line-1: var(--line-1);
+  --color-line-2: var(--line-2);
+  --color-line-3: var(--line-3);
+  --color-own: var(--own);
+  --color-on-own: var(--on-own);
+  --color-other: var(--other);
+  --color-accent: var(--accent);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-line: var(--accent-line);
+  --color-ring: var(--ring);
+}
+
+@utility shadow-panel {
+  box-shadow: var(--sh-panel);
+}
+@utility shadow-pop {
+  box-shadow: var(--sh-pop);
+}
+@utility shadow-pill {
+  box-shadow: var(--sh-pill);
+}
 
 @theme {
   --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
-
-  /* palette */
-  --color-void: #0b0b0c;
-  --color-coal: #161618; /* the only opaque raised surface: popovers */
-  --color-bone: #ecebe7;
-  --color-sage: #b3c0a5;
-
-  /*
-   * ink — bone at four strengths.
-   * Alphas are set so every tier passes WCAG AA (4.5:1) on the brightest
-   * surface it can land on: the mobile composer over the glow at the far end
-   * of its drift (ink-4 measures 5.0:1 there). Don't lower them. See DESIGN_BRIEF.md §4.
-   */
-  --color-ink: #ecebe7;
-  --color-ink-2: rgb(236 235 231 / 0.8);
-  --color-ink-3: rgb(236 235 231 / 0.66);
-  --color-ink-4: rgb(236 235 231 / 0.6);
-
-  /* neutral fills and hairlines */
-  --color-fill-1: rgb(255 255 255 / 0.03);
-  --color-fill-2: rgb(255 255 255 / 0.05);
-  --color-fill-3: rgb(255 255 255 / 0.08);
-  --color-line-1: rgb(255 255 255 / 0.06);
-  --color-line-2: rgb(255 255 255 / 0.1);
-  --color-line-3: rgb(255 255 255 / 0.18);
-
-  /* the assistant's presence */
-  --color-sage-wash: rgb(179 192 165 / 0.06);
-  --color-sage-line: rgb(179 192 165 / 0.2);
-  --color-sage-glow: rgb(179 192 165 / 0.4);
 
   --text-micro: 11px;
   --text-micro--line-height: 16px;
@@ -69,13 +152,13 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
-  --animate-breathe: breathe 3.2s var(--ease-in-out) infinite;
+  --animate-breathe: breathe 2.4s var(--ease-in-out) infinite;
   --animate-breathe-fast: breathe 1.2s var(--ease-in-out) infinite;
 
   @keyframes breathe {
     0%,
     100% {
-      opacity: 0.4;
+      opacity: 0.45;
     }
     50% {
       opacity: 1;
@@ -85,14 +168,13 @@
 
 @layer base {
   html {
-    color-scheme: dark;
-    background: var(--color-void);
+    background: var(--canvas);
   }
 
-  /* No background here: it would paint over the fixed, negative-z backdrop. */
   body {
     min-height: 100dvh;
-    color: var(--color-ink);
+    background: var(--canvas);
+    color: var(--ink);
     font-family: var(--font-sans);
     font-size: var(--text-base);
     line-height: var(--text-base--line-height);
@@ -103,24 +185,23 @@
   }
 
   ::selection {
-    background: rgb(236 235 231 / 0.2);
-    color: var(--color-bone);
+    background: var(--selection);
+    color: var(--ink);
   }
 
+  /* Instant, never animated: keyboard users shouldn't wait to see where they are. */
   :focus-visible {
-    outline: 2px solid rgb(236 235 231 / 0.7);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-line-2) transparent;
+    scrollbar-color: var(--line-2) transparent;
   }
 }
 
 @layer components {
-  /* ── Type ─────────────────────────────────────────────────── */
-
   .tnum {
     font-variant-numeric: tabular-nums;
   }
@@ -135,21 +216,19 @@
     height: 44px;
     padding: 0 18px;
     border-radius: var(--radius-md);
-    border: 1px solid transparent;
     font-size: var(--text-base);
     font-weight: 500;
     white-space: nowrap;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     transition:
-      transform 160ms var(--ease-out),
-      background-color 200ms var(--ease-out),
-      border-color 200ms var(--ease-out),
-      color 200ms var(--ease-out),
-      opacity 200ms var(--ease-out);
+      transform 120ms var(--ease-out),
+      background-color 150ms var(--ease-out),
+      color 150ms var(--ease-out),
+      opacity 150ms var(--ease-out);
   }
   .btn:active:not(:disabled) {
-    transform: scale(0.98);
+    transform: scale(0.97);
   }
   .btn:disabled {
     cursor: not-allowed;
@@ -157,35 +236,36 @@
   }
 
   .btn-primary {
-    background: var(--color-bone);
-    color: var(--color-void);
+    background: var(--ink);
+    color: var(--panel);
   }
   .btn-primary:hover:not(:disabled) {
-    background: #ffffff;
+    background: color-mix(in srgb, var(--ink) 88%, var(--panel));
   }
 
   .btn-ghost {
-    background: var(--color-fill-2);
-    color: var(--color-ink-2);
+    background: var(--fill-2);
+    color: var(--ink);
   }
   .btn-ghost:hover:not(:disabled) {
-    background: var(--color-fill-3);
-    color: var(--color-ink);
+    background: var(--fill-3);
   }
 
   .btn-quiet {
     background: transparent;
-    color: var(--color-ink-3);
+    color: var(--ink-3);
   }
   .btn-quiet:hover:not(:disabled) {
-    background: var(--color-fill-2);
-    color: var(--color-ink);
+    background: var(--fill-2);
+    color: var(--ink);
   }
 
+  /* Round icon buttons, as in the references. */
   .btn-icon {
     width: 40px;
     height: 40px;
     padding: 0;
+    border-radius: 9999px;
   }
 
   .field {
@@ -193,28 +273,33 @@
     height: 46px;
     padding: 0 14px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--color-line-1);
-    background: var(--color-fill-2);
-    color: var(--color-ink);
+    border: 1px solid transparent;
+    background: var(--field);
+    color: var(--ink);
     font-size: var(--text-body);
     transition:
-      border-color 200ms var(--ease-out),
-      background-color 200ms var(--ease-out),
-      box-shadow 200ms var(--ease-out);
+      border-color 150ms var(--ease-out),
+      background-color 150ms var(--ease-out);
   }
   .field::placeholder {
-    color: var(--color-ink-4);
+    color: var(--ink-4);
   }
   .field:hover {
-    border-color: var(--color-line-2);
+    border-color: var(--line-2);
   }
   .field:focus {
     outline: none;
-    border-color: rgb(236 235 231 / 0.4);
-    box-shadow: 0 0 0 3px rgb(236 235 231 / 0.07);
+    border-color: var(--line-3);
+    background: var(--panel);
+  }
+  /* One ring hugging the field, not a border plus an outline. */
+  .field:focus-visible {
+    border-color: transparent;
+    outline: 2px solid var(--ring);
+    outline-offset: 0;
   }
   .field[aria-invalid="true"] {
-    border-color: rgb(236 235 231 / 0.34);
+    border-color: var(--line-3);
   }
 
   .kbd {
@@ -226,45 +311,139 @@
     min-width: 20px;
     padding: 0 6px;
     border-radius: var(--radius-xs);
-    background: var(--color-fill-2);
+    background: var(--fill-2);
     font-family: var(--font-sans);
     font-size: var(--text-micro);
     font-weight: 500;
     line-height: 1;
-    color: var(--color-ink-3);
+    color: var(--ink-3);
+  }
+
+  /* ── Surfaces ─────────────────────────────────────────────── */
+
+  .pop {
+    border-radius: var(--radius-lg);
+    background: var(--raised);
+    box-shadow: var(--sh-pop);
+  }
+  /* On a raised surface the field ground is too close to it (dark: #1c1c20 on #1a1a1e); tint instead. */
+  .pop .field:not(:focus) {
+    background: var(--fill-2);
+  }
+
+  /* A loading placeholder: a soft band sweeps across it (transform only). */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--fill-2);
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--shimmer), transparent);
+    animation: shimmer 1.4s var(--ease-in-out) infinite;
+  }
+
+  /* ── Someone is typing: three dots in a travelling wave ───── */
+
+  .dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 12px;
+  }
+  .dots > span {
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: currentColor;
+    /* Negative delays start every dot mid-wave, each 0.15s behind the one before. */
+    animation: wave 1.2s linear infinite;
+    animation-delay: calc(var(--i) * 0.15s - 1.2s);
   }
 
   /* ── The assistant's words ────────────────────────────────── */
 
-  /* Each word surfaces from nothing; the colour never shifts. */
   .word-in {
     animation: word-in 420ms var(--ease-out) both;
   }
 
+  /* The light behind the composer while the assistant works. */
+  .thinking-glow {
+    background:
+      radial-gradient(40% 60% at 35% 100%, var(--accent-glow), transparent 70%),
+      radial-gradient(35% 55% at 70% 100%, var(--accent-glow-2), transparent 70%);
+    animation: breathe 2.4s var(--ease-in-out) infinite;
+  }
+
   /* ── Thread scroller: content dissolves at the edges ──────── */
 
-  /*
-   * Fully clear under the 64px header, then a soft fade into view. At the
-   * bottom, text dissolves just above the composer (whose height Thread
-   * publishes as --composer-h), so the composer needs no blur to hide it.
-   */
   .thread-fade {
     -webkit-mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      transparent 60px,
-      #000 116px,
+      transparent 56px,
+      #000 104px,
       #000 calc(100% - var(--composer-h, 96px) - 12px),
       transparent calc(100% - var(--composer-h, 96px) + 12px)
     );
     mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      transparent 60px,
-      #000 116px,
+      transparent 56px,
+      #000 104px,
       #000 calc(100% - var(--composer-h, 96px) - 12px),
       transparent calc(100% - var(--composer-h, 96px) + 12px)
     );
+  }
+
+  /*
+   * The rail fades in with the page. On phones it also comes back from a thread without a
+   * remount: display:none -> flex restarts the animation, so it rises in each time.
+   */
+  .rail-in {
+    animation: fade-in 350ms var(--ease-out) backwards;
+  }
+  @media (max-width: 767px) {
+    .rail-in {
+      animation: rise-in 280ms var(--ease-out) backwards;
+    }
+  }
+}
+
+/*
+ * A travelling sine, one up-and-down cycle: soft at the ends, quickest through the middle.
+ * Opacity never drops below 0.7, so even the lowest dot keeps 3:1 against its ground.
+ */
+@keyframes wave {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.85;
+    animation-timing-function: var(--ease-in-out);
+  }
+  25% {
+    transform: translateY(-3px);
+    opacity: 1;
+    animation-timing-function: var(--ease-in-out);
+  }
+  50% {
+    transform: translateY(0);
+    opacity: 0.85;
+    animation-timing-function: var(--ease-in-out);
+  }
+  75% {
+    transform: translateY(2px);
+    opacity: 0.7;
+    animation-timing-function: var(--ease-in-out);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
   }
 }
 
@@ -274,28 +453,46 @@
   }
 }
 
-@keyframes drift {
-  to {
-    transform: translate3d(6vw, -4vh, 0) scale(1.08);
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
 }
 
-@keyframes rise-in {
+@keyframes fade-in {
   from {
     opacity: 0;
   }
 }
 
+/* Theme switch: the browser crossfades a snapshot of the old page into the new one. */
+::view-transition {
+  pointer-events: none; /* clicks pass through to the live page underneath */
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 300ms;
+  animation-timing-function: var(--ease-in-out);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .word-in {
+  /* Fades stay; movement goes. */
+  .dots > span {
     animation: none;
+    opacity: 0.85;
   }
+  .skeleton::after {
+    animation: none;
+    opacity: 0;
+  }
+  .thinking-glow,
   .animate-breathe,
   .animate-breathe-fast {
     animation: none;
     opacity: 0.8;
   }
-  [data-drift] {
-    animation: none !important;
+  .rail-in {
+    animation-name: fade-in;
   }
 }

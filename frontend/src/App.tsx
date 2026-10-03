@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { useAuthStore } from "./stores/authStore";
-import Backdrop from "./components/ui/Backdrop";
 import Presence from "./components/ui/Presence";
 import AuthShell from "./components/auth/AuthShell";
 import LoginPage from "./pages/LoginPage";
@@ -24,7 +23,7 @@ function Splash() {
     return (
         <div className="grid min-h-dvh place-items-center" role="status">
             <span className="sr-only">Restoring your session</span>
-            <span style={{ animation: "rise-in 400ms var(--ease-out) 400ms both" }}>
+            <span style={{ animation: "fade-in 400ms var(--ease-out) 400ms both" }}>
                 <Presence mode="think" className="size-2" />
             </span>
         </div>
@@ -41,7 +40,6 @@ export default function App() {
 
     return (
         <MotionConfig reducedMotion="user">
-            <Backdrop />
             {ready ? (
                 <BrowserRouter>
                     <Routes>
